@@ -1,5 +1,11 @@
 # Importar cuentos y canciones (JSON)
 
+## Tokenizar con Gemini
+
+En `/admin/#/import` pega japonés crudo y pulsa **Tokenizar con Gemini**. El backend llama a `gemini-2.5-flash` con structured output y rellena el JSON.
+
+Variable: `GEMINI_API_KEY` (opcional `GEMINI_MODEL`). Sin key, el botón responde 503.
+
 El panel admin acepta un JSON generado por otro agente. Pégalo en `/admin/#/import` o `POST /api/admin/import` con `X-Admin-Key`.
 
 ## Forma del JSON

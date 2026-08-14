@@ -736,6 +736,28 @@ function renderImport() {
         </div>
       </div>
       <section class="editor pad import-panel">
+        <div class="kicker">Gemini</div>
+        <h2>Tokenizar texto crudo</h2>
+        <p class="muted">Pega el cuento o la letra en japonés. Gemini lo convierte al JSON de KanjiBE y lo deja abajo para que lo revises e importes.</p>
+        <div class="meta-grid">
+          <label class="field">
+            <span>Tipo</span>
+            <select id="tokenize-kind">
+              <option value="auto">Auto</option>
+              <option value="story">Cuento</option>
+              <option value="lyric">Canción</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span>Texto japonés</span>
+          <textarea id="raw-jp" class="jp import-json" lang="ja" spellcheck="false" placeholder="飛翔たいたら…"></textarea>
+        </label>
+        <div class="actions">
+          <button class="primary" id="run-tokenize" type="button">Tokenizar con Gemini</button>
+        </div>
+      </section>
+      <section class="editor pad import-panel import-panel-json">
         <div class="add-row">
           <button class="ghost" id="load-example" type="button">Cargar ejemplo</button>
           <button class="ghost" id="copy-prompt" type="button">Copiar prompt del agente</button>
@@ -756,9 +778,33 @@ function renderImport() {
     `
   );
   bindLogout();
-  enablePlainPaste(document.querySelector(".import-panel"));
+  document.querySelectorAll(".import-panel").forEach((panel) => enablePlainPaste(panel));
 
   const textarea = document.querySelector("#import-json");
+  document.querySelector("#run-tokenize").addEventListener("click", async () => {
+    const text = document.querySelector("#raw-jp").value.trim();
+    if (!text) {
+      toast("Pega el texto japonés", "error");
+      return;
+    }
+    const button = document.querySelector("#run-tokenize");
+    button.disabled = true;
+    button.textContent = "Tokenizando…";
+    try {
+      const kind = document.querySelector("#tokenize-kind").value;
+      const data = await api("/api/admin/tokenize", {
+        method: "POST",
+        body: JSON.stringify({ text, kind })
+      });
+      textarea.value = JSON.stringify(data, null, 2);
+      toast("JSON listo. Revísalo e importa.", "ok");
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Tokenizar con Gemini";
+    }
+  });
   document.querySelector("#load-example").addEventListener("click", () => {
     textarea.value = IMPORT_EXAMPLE;
   });

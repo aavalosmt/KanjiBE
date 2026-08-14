@@ -20,7 +20,9 @@ export const config = {
     ""
   ),
   corsOrigin: process.env.CORS_ORIGIN ?? "*",
-  uploadDir: process.env.UPLOAD_DIR ?? "./uploads"
+  uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.5-flash"
 };
 
 if (!config.adminApiKey && config.nodeEnv === "production") {

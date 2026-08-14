@@ -94,7 +94,7 @@ describe("admin ui", () => {
 
     const ok = await request(app).get("/api/admin/session").set(admin);
     expect(ok.status).toBe(200);
-    expect(ok.body).toEqual({ ok: true });
+    expect(ok.body.ok).toBe(true);
   });
 });
 
@@ -227,6 +227,25 @@ describe("admin lyrics", () => {
     expect(updated.status).toBe(200);
     expect(updated.body.blocks).toHaveLength(1);
     expect(updated.body.blocks[0].id).toBeTruthy();
+  });
+});
+
+describe("admin tokenize", () => {
+  it("returns 503 when Gemini is not configured", async () => {
+    const res = await request(app)
+      .post("/api/admin/tokenize")
+      .set(admin)
+      .send({ text: "家族", kind: "story" });
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/GEMINI_API_KEY/);
+  });
+
+  it("rejects empty text", async () => {
+    const res = await request(app)
+      .post("/api/admin/tokenize")
+      .set(admin)
+      .send({ text: "  " });
+    expect(res.status).toBe(400);
   });
 });
 

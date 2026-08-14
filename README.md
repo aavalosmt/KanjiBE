@@ -26,6 +26,7 @@ El servidor queda en `http://localhost:3000`.
 
 Panel CRUD: [http://localhost:3000/admin/](http://localhost:3000/admin/)  
 Importar JSON (cuentos/canciones): [http://localhost:3000/admin/#/import](http://localhost:3000/admin/#/import) — formato en [`docs/import-json.md`](docs/import-json.md).  
+Tokenizar con Gemini: misma página, requiere `GEMINI_API_KEY`.  
 Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a hosting).
 
 ## Endpoints públicos (iOS)

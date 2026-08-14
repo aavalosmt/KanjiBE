@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { Router } from "express";
+import { z } from "zod";
+import { config } from "../config.js";
 import { prisma } from "../db.js";
+import { parseJapaneseToKanjiBE } from "../lib/gemini.js";
 import { serializeBlocks, toLyric, toStory } from "../lib/serialize.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
@@ -18,7 +21,23 @@ export const adminRouter = Router();
 adminRouter.use(requireAdmin);
 
 adminRouter.get("/session", (_req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, gemini: Boolean(config.geminiApiKey) });
+});
+
+const tokenizeSchema = z.object({
+  text: z.string().trim().min(1),
+  kind: z.enum(["story", "lyric", "auto"]).default("auto")
+});
+
+adminRouter.post("/tokenize", async (req, res) => {
+  const payload = tokenizeSchema.parse(req.body);
+  if (!config.geminiApiKey) {
+    res.status(503).json({ error: "GEMINI_API_KEY is not configured" });
+    return;
+  }
+
+  const data = await parseJapaneseToKanjiBE(payload.text, payload.kind);
+  res.json(data);
 });
 
 adminRouter.post("/import", async (req, res) => {

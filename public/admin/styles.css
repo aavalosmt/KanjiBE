@@ -400,8 +400,12 @@ rt {
   cursor: pointer;
 }
 
+.import-panel-json {
+  margin-top: 1rem;
+}
+
 .import-json {
-  min-height: 22rem;
+  min-height: 16rem;
   font-family: var(--mono);
 }
 

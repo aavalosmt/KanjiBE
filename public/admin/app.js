@@ -719,7 +719,8 @@ Forma:
 }
 
 blocks: array de { "type": "text"|"header"|"image", "content"?, "translation"?, "url"?, "caption"? }
-- text/header: content con furigana [漢字](furigana:かん.じ). Varios kanji: か.ぞく. Okurigana: た.べる
+- Agrupa jukugo: [飛翔](furigana:ひ.しょう) [飛行機](furigana:ひ.こう.き) NO [飛][翔]
+- Okurigana: [食](furigana:た)べる
 - image: url absoluta
 level: N5|N4|N3|N2|N1
 No inventes ids. coverUrl puede ser null.`;

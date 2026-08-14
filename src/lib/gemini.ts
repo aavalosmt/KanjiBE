@@ -9,7 +9,7 @@ const blockSchema = {
     content: {
       type: Type.STRING,
       description:
-        "Japanese text with KanjiBE furigana: [漢字](furigana:かん.じ). Compound: [家族](furigana:か.ぞく). Okurigana: [食べる](furigana:た.べる)."
+        "Japanese with word-level furigana. Keep jukugo together: [飛翔](furigana:ひ.しょう) not [飛](furigana:ひ)[翔](furigana:しょう)."
     },
     translation: { type: Type.STRING, description: "Spanish translation of this block" },
     url: { type: Type.STRING, description: "Image URL when type is image" },
@@ -51,19 +51,32 @@ const responseSchema = {
   required: ["stories", "lyrics"]
 };
 
-const SYSTEM_INSTRUCTION = `Eres un extractor para KanjiBE. Convierte japonés (cuento o letra) en JSON con bloques y furigana.
+const SYSTEM_INSTRUCTION = `Eres un extractor y formateador de texto en japonés para KanjiBE.
+Convierte letras o historias en bloques tokenizados con furigana.
 
-Reglas de content:
-1. Sintaxis exacta: [Surface](furigana:lecturas)
-2. Varios kanji: [家族](furigana:か.ぞく)
-3. Okurigana: [食べる](furigana:た.べる) — el kana de superficie va DENTRO de los corchetes, lecturas separadas por punto
-4. Jukujikun sin punto: [今日](furigana:きょう)
-5. No pongas furigana en kana suelto ni en puntuación
-6. Un bloque text por párrafo o verso. Usa header para estribillo/verso.
-7. Traducciones al español.
-8. Si kind=story, llena stories y deja lyrics []. Si kind=lyric, al revés. Si auto, decide.
-9. No inventes ids ni coverUrl (usa null).
-10. No inventes imágenes.`;
+REGLAS DE TOKENIZACIÓN Y PALABRAS COMPUESTAS (CRÍTICO):
+1. NO dividas kanjis individuales si forman una sola palabra o compuesto (熟語 / jukugo).
+   - INCORRECTO: [飛](furigana:ひ)[翔](furigana:しょう)
+   - CORRECTO: [飛翔](furigana:ひ.しょう)
+   - INCORRECTO: [飛](furigana:ひ)[行](furigana:こう)[機](furigana:き)
+   - CORRECTO: [飛行機](furigana:ひ.こう.き)
+   - INCORRECTO: [未](furigana:み)[知](furigana:ち)
+   - CORRECTO: [未知](furigana:み.ち)
+   - INCORRECTO: [世](furigana:せ)[界](furigana:かい)
+   - CORRECTO: [世界](furigana:せ.かい)
+2. Mantén sustantivos compuestos, verbos conjugados y adjetivos juntos como un solo token léxico.
+   - INCORRECTO: [目指](furigana:め.ざ) したのは
+   - CORRECTO: [目指](furigana:め.ざ)したのは
+3. La lectura de un compuesto DEBE separar las lecturas de cada kanji con punto, en el mismo orden.
+   - [世界](furigana:せ.かい) [感情](furigana:かん.じょう) [家族](furigana:か.ぞく)
+4. Jukujikun (una lectura para todo el compuesto) va SIN puntos: [今日](furigana:きょう) [明日](furigana:あした)
+5. Okurigana: la raíz en kanji, el kana de conjugación fuera del corchete.
+   - [食](furigana:た)べる  [目指](furigana:め.ざ)した
+6. No pongas furigana en kana suelto ni en puntuación.
+7. Un bloque text por párrafo o verso. Usa header para estribillo/verso.
+8. Traducciones al español.
+9. Si kind=story, llena stories y deja lyrics []. Si kind=lyric, al revés. Si auto, decide.
+10. No inventes ids, coverUrl (usa null) ni imágenes.`;
 
 export const PREFERRED_GEMINI_MODELS = [
   "gemini-2.0-flash",
@@ -73,7 +86,8 @@ export const PREFERRED_GEMINI_MODELS = [
   "gemini-2.5-pro",
   "gemini-1.5-pro",
   "gemini-2.0-flash-lite",
-  "gemini-1.5-flash-8b"
+  "gemini-1.5-flash-8b",
+  "gemini-3.1-lite"
 ];
 
 function normalizeModelId(name: string): string {
@@ -143,7 +157,7 @@ export async function parseJapaneseToKanjiBE(
       systemInstruction: SYSTEM_INSTRUCTION,
       responseMimeType: "application/json",
       responseSchema,
-      temperature: 0.1
+      temperature: 0
     }
   });
 

@@ -92,6 +92,36 @@ export function normalizeBlocks(
   });
 }
 
+export const importSchema = z
+  .object({
+    stories: z.array(storyCreateSchema).default([]),
+    lyrics: z.array(lyricCreateSchema).default([])
+  })
+  .refine((value) => value.stories.length + value.lyrics.length > 0, {
+    message: "Provide at least one story or lyric"
+  });
+
+export function normalizeImportPayload(body: unknown): unknown {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return body;
+  }
+
+  const record = body as Record<string, unknown>;
+  if (Array.isArray(record.stories) || Array.isArray(record.lyrics)) {
+    return body;
+  }
+
+  if (typeof record.title === "string" && typeof record.artist === "string") {
+    return { stories: [], lyrics: [record] };
+  }
+
+  if (typeof record.title === "string" && typeof record.level === "string") {
+    return { stories: [record], lyrics: [] };
+  }
+
+  return body;
+}
+
 export function parseBlocks(value: unknown): ContentBlock[] {
   const parsed = z.array(blockSchema).safeParse(value);
   if (!parsed.success) {

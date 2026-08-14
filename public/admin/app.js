@@ -181,6 +181,7 @@ function layout(active, body) {
       <nav class="nav">
         <a href="#/stories" class="${active === "stories" ? "active" : ""}">Historias</a>
         <a href="#/lyrics" class="${active === "lyrics" ? "active" : ""}">Letras</a>
+        <a href="#/import" class="${active === "import" ? "active" : ""}">Importar</a>
         <button class="ghost" id="logout" type="button">Salir</button>
       </nav>
     </header>
@@ -260,7 +261,10 @@ function renderList(kind, items) {
           <div class="kicker">Contenido</div>
           <h1>${isStory ? "Historias" : "Letras"}</h1>
         </div>
-        <a class="primary" href="#/${kind}/new">Nueva ${isStory ? "historia" : "letra"}</a>
+        <div class="actions">
+          <a class="ghost" href="#/import">Importar JSON</a>
+          <a class="primary" href="#/${kind}/new">Nueva ${isStory ? "historia" : "letra"}</a>
+        </div>
       </div>
       <section class="grid">${cards}</section>
     `
@@ -671,6 +675,129 @@ function renderEditor(kind, item) {
   bindEditor(kind, isNew, item?.id);
 }
 
+const IMPORT_EXAMPLE = `{
+  "stories": [
+    {
+      "title": "本文",
+      "level": "N3",
+      "translation": "Texto Principal",
+      "blocks": [
+        {
+          "type": "text",
+          "content": "[家族](furigana:か.ぞく)で[正月](furigana:しょう.がつ)を[すごす](furigana:すごす)。",
+          "translation": "Pasamos el Año Nuevo en familia."
+        }
+      ]
+    }
+  ],
+  "lyrics": [
+    {
+      "title": "Brave Heart",
+      "artist": "Ayumi Miyazaki",
+      "translation": "Corazón Valiente",
+      "blocks": [
+        {
+          "type": "header",
+          "content": "Verso 1"
+        },
+        {
+          "type": "text",
+          "content": "[逃げ出さ](furigana:に.げ.だ.さ)ないことは [解](furigana:わか)っている",
+          "translation": "Sé que no voy a huir"
+        }
+      ]
+    }
+  ]
+}`;
+
+const AGENT_PROMPT = `Genera JSON para KanjiBE. Responde SOLO con un objeto JSON válido, sin markdown.
+
+Forma:
+{
+  "stories": [{ "title", "level", "translation", "coverUrl", "blocks" }],
+  "lyrics": [{ "title", "artist", "translation", "coverUrl", "blocks" }]
+}
+
+blocks: array de { "type": "text"|"header"|"image", "content"?, "translation"?, "url"?, "caption"? }
+- text/header: content con furigana [漢字](furigana:かん.じ). Varios kanji: か.ぞく. Okurigana: た.べる
+- image: url absoluta
+level: N5|N4|N3|N2|N1
+No inventes ids. coverUrl puede ser null.`;
+
+function renderImport() {
+  app.innerHTML = layout(
+    "import",
+    `
+      <div class="row">
+        <div>
+          <div class="kicker">Lote</div>
+          <h1>Importar JSON</h1>
+          <p class="muted">Pega el JSON de otro agente o sube un .json. Si el objeto trae id y ya existe, se actualiza.</p>
+        </div>
+      </div>
+      <section class="editor pad import-panel">
+        <div class="add-row">
+          <button class="ghost" id="load-example" type="button">Cargar ejemplo</button>
+          <button class="ghost" id="copy-prompt" type="button">Copiar prompt del agente</button>
+          <label class="ghost file-label">
+            Subir archivo
+            <input id="import-file" class="hidden-file" type="file" accept="application/json,.json" />
+          </label>
+        </div>
+        <label class="field">
+          <span>JSON</span>
+          <textarea id="import-json" class="import-json" spellcheck="false" placeholder='{ "stories": [], "lyrics": [] }'></textarea>
+        </label>
+        <div class="actions">
+          <button class="primary" id="run-import" type="button">Importar</button>
+        </div>
+        <pre id="import-result" class="import-result" hidden></pre>
+      </section>
+    `
+  );
+  bindLogout();
+  enablePlainPaste(document.querySelector(".import-panel"));
+
+  const textarea = document.querySelector("#import-json");
+  document.querySelector("#load-example").addEventListener("click", () => {
+    textarea.value = IMPORT_EXAMPLE;
+  });
+  document.querySelector("#copy-prompt").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(AGENT_PROMPT);
+    toast("Prompt copiado", "ok");
+  });
+  document.querySelector("#import-file").addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    textarea.value = await file.text();
+  });
+  document.querySelector("#run-import").addEventListener("click", async () => {
+    const resultEl = document.querySelector("#import-result");
+    let payload;
+    try {
+      payload = JSON.parse(textarea.value);
+    } catch {
+      toast("JSON inválido", "error");
+      return;
+    }
+    try {
+      const result = await api("/api/admin/import", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      const created =
+        result.created.stories.length + result.created.lyrics.length;
+      const updated =
+        result.updated.stories.length + result.updated.lyrics.length;
+      toast(`Creados ${created}, actualizados ${updated}`, result.errors.length ? "error" : "ok");
+      resultEl.hidden = false;
+      resultEl.textContent = JSON.stringify(result, null, 2);
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
+}
+
 async function route() {
   const { section, id } = parseRoute();
   if (section === "login") {
@@ -688,6 +815,10 @@ async function route() {
     if (section === "lyrics" && !id) {
       const list = await api("/api/lyrics?limit=100");
       renderList("lyrics", list.data);
+      return;
+    }
+    if (section === "import") {
+      renderImport();
       return;
     }
     if (section === "stories" || section === "lyrics") {

@@ -4,9 +4,11 @@ import { prisma } from "../db.js";
 import { serializeBlocks, toLyric, toStory } from "../lib/serialize.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
+  importSchema,
   lyricCreateSchema,
   lyricUpdateSchema,
   normalizeBlocks,
+  normalizeImportPayload,
   storyCreateSchema,
   storyUpdateSchema
 } from "../validators.js";
@@ -17,6 +19,77 @@ adminRouter.use(requireAdmin);
 
 adminRouter.get("/session", (_req, res) => {
   res.json({ ok: true });
+});
+
+adminRouter.post("/import", async (req, res) => {
+  const payload = importSchema.parse(normalizeImportPayload(req.body));
+  const created = { stories: [] as ReturnType<typeof toStory>[], lyrics: [] as ReturnType<typeof toLyric>[] };
+  const updated = { stories: [] as ReturnType<typeof toStory>[], lyrics: [] as ReturnType<typeof toLyric>[] };
+  const errors: Array<{ type: "story" | "lyric"; index: number; id?: string; error: string }> = [];
+
+  for (const [index, item] of payload.stories.entries()) {
+    try {
+      const data = {
+        title: item.title,
+        level: item.level,
+        translation: item.translation ?? null,
+        coverUrl: item.coverUrl ?? null,
+        blocks: serializeBlocks(normalizeBlocks(item.blocks))
+      };
+      if (item.id) {
+        const existing = await prisma.story.findUnique({ where: { id: item.id } });
+        if (existing) {
+          const story = await prisma.story.update({ where: { id: item.id }, data });
+          updated.stories.push(toStory(story));
+          continue;
+        }
+      }
+      const story = await prisma.story.create({ data: { id: item.id, ...data } });
+      created.stories.push(toStory(story));
+    } catch (error) {
+      errors.push({
+        type: "story",
+        index,
+        id: item.id,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  for (const [index, item] of payload.lyrics.entries()) {
+    try {
+      const data = {
+        title: item.title,
+        artist: item.artist,
+        translation: item.translation ?? null,
+        coverUrl: item.coverUrl ?? null,
+        blocks: serializeBlocks(normalizeBlocks(item.blocks))
+      };
+      if (item.id) {
+        const existing = await prisma.lyric.findUnique({ where: { id: item.id } });
+        if (existing) {
+          const lyric = await prisma.lyric.update({ where: { id: item.id }, data });
+          updated.lyrics.push(toLyric(lyric));
+          continue;
+        }
+      }
+      const lyric = await prisma.lyric.create({ data: { id: item.id, ...data } });
+      created.lyrics.push(toLyric(lyric));
+    } catch (error) {
+      errors.push({
+        type: "lyric",
+        index,
+        id: item.id,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  res.status(errors.length && !created.stories.length && !created.lyrics.length && !updated.stories.length && !updated.lyrics.length ? 400 : 200).json({
+    created,
+    updated,
+    errors
+  });
 });
 
 adminRouter.post("/stories", async (req, res) => {

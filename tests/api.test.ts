@@ -230,6 +230,42 @@ describe("admin lyrics", () => {
   });
 });
 
+describe("admin import", () => {
+  it("imports stories and lyrics from a batch json", async () => {
+    const res = await request(app)
+      .post("/api/admin/import")
+      .set(admin)
+      .send({
+        stories: [{ title: "川", level: "N5", blocks: [{ type: "text", content: "[川](furigana:かわ)" }] }],
+        lyrics: [{ title: "Umi", artist: "Test", blocks: [{ type: "header", content: "A" }] }]
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.created.stories).toHaveLength(1);
+    expect(res.body.created.lyrics).toHaveLength(1);
+    expect(res.body.created.stories[0].title).toBe("川");
+
+    const stories = await request(app).get("/api/stories");
+    expect(stories.body.data.some((item: { title: string }) => item.title === "川")).toBe(true);
+  });
+
+  it("wraps a single story object and updates when id exists", async () => {
+    const created = await request(app)
+      .post("/api/admin/import")
+      .set(admin)
+      .send({ id: "import-1", title: "旧", level: "N4" });
+    expect(created.status).toBe(200);
+    expect(created.body.created.stories[0].id).toBe("import-1");
+
+    const updated = await request(app)
+      .post("/api/admin/import")
+      .set(admin)
+      .send({ id: "import-1", title: "新", level: "N3" });
+    expect(updated.body.updated.stories[0].title).toBe("新");
+    expect(updated.body.created.stories).toHaveLength(0);
+  });
+});
+
 describe("admin upload", () => {
   it("stores an image and returns a public url", async () => {
     const png = Buffer.from(

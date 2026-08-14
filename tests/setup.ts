@@ -1,8 +1,12 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 
 process.env.NODE_ENV = "test";
-process.env.DATABASE_URL = "file:./data/test.db";
+const dbFile = path.resolve("data", "test.db");
+process.env.DATABASE_URL = dbFile.startsWith("/")
+  ? `file://${dbFile}`
+  : `file:${dbFile}`;
 process.env.ADMIN_API_KEY = "test-admin-key";
 process.env.PUBLIC_BASE_URL = "http://localhost:3000";
 process.env.UPLOAD_DIR = "./uploads-test";

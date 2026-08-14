@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { databaseUrl } from "./dbUrl.js";
 
 function numberEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -9,15 +10,10 @@ function numberEnv(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-const sqliteUrl =
-  process.env.NODE_ENV === "test"
-    ? (process.env.DATABASE_URL ?? "file:./data/test.db")
-    : "file:./data/kanji.db";
-
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: numberEnv("PORT", 3000),
-  databaseUrl: sqliteUrl,
+  databaseUrl,
   adminApiKey: process.env.ADMIN_API_KEY ?? "",
   publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(
     /\/$/,

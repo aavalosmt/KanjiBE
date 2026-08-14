@@ -1,0 +1,5 @@
+[variables]
+DATABASE_URL = "file:./data/kanji.db"
+
+[phases.setup]
+nixPkgs = ["openssl"]

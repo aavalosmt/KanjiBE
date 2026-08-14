@@ -166,7 +166,9 @@ Compose monta volúmenes para `/app/data` y `/app/uploads`.
 
 ### Fase 1 — Railway
 
-El crash `Environment variable not found: DATABASE_URL` salía porque `prisma generate` corre en el **build**. Railway no inyecta las variables de runtime ahí. El Dockerfile / `postinstall` ya usan un default (`file:./data/kanji.db`) para poder generar el client.
+Prisma ya no lee `DATABASE_URL` en el schema (queda `file:./data/kanji.db`). El build no puede volver a fallar por una env que Railway no inyecta. En runtime, `PrismaClient` sigue pudiendo usar `DATABASE_URL` si la pones.
+
+El crash de las 15:45 (OpenSSL 1.1 + `env("DATABASE_URL")`) es de **Nixpacks/Railpack**, no del Dockerfile. En Settings → Build confirma **Dockerfile**, rama **`main`**, y abre el deploy nuevo (otro timestamp). No hace falta `git pull` en Railway.
 
 Después de pushear este cambio:
 

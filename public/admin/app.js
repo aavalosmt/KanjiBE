@@ -331,7 +331,7 @@ function blockEditor(block, index) {
       ${common}
       <label class="field">
         <span>Contenido</span>
-        <textarea data-field="content">${escapeHtml(block.content)}</textarea>
+        <textarea data-field="content" class="jp" lang="ja" spellcheck="false" autocomplete="off">${escapeHtml(block.content)}</textarea>
       </label>
       <label class="field">
         <span>Traducción</span>
@@ -448,12 +448,53 @@ async function uploadFile() {
   });
 }
 
+function clipboardText(event) {
+  const plain = event.clipboardData?.getData("text/plain");
+  if (plain) return plain;
+  const html = event.clipboardData?.getData("text/html");
+  if (!html) return "";
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent ?? "";
+}
+
+function enablePlainPaste(root) {
+  root.addEventListener("paste", (event) => {
+    const field = event.target;
+    if (
+      !(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) ||
+      field.type === "file" ||
+      field.type === "password"
+    ) {
+      return;
+    }
+    const text = clipboardText(event);
+    if (!text) return;
+    event.preventDefault();
+    const start = field.selectionStart ?? field.value.length;
+    const end = field.selectionEnd ?? start;
+    field.setRangeText(text, start, end, "end");
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
 function bindEditor(kind, isNew, id) {
   const form = document.querySelector("#editor-form");
   const blocksRoot = document.querySelector("#blocks");
+  let composing = false;
 
   const refreshPreview = () => renderPreview(kind, form);
-  form.addEventListener("input", refreshPreview);
+  form.addEventListener("compositionstart", () => {
+    composing = true;
+  });
+  form.addEventListener("compositionend", () => {
+    composing = false;
+    refreshPreview();
+  });
+  form.addEventListener("input", () => {
+    if (!composing) refreshPreview();
+  });
+  enablePlainPaste(form);
   refreshPreview();
 
   document.querySelectorAll("[data-add]").forEach((button) => {
@@ -566,7 +607,17 @@ function renderEditor(kind, item) {
           <div class="meta-grid">
             <label class="field">
               <span>Título</span>
-              <input name="title" required value="${escapeHtml(item?.title)}" />
+              <input
+                name="title"
+                class="jp"
+                lang="ja"
+                spellcheck="false"
+                autocomplete="off"
+                autocapitalize="off"
+                placeholder="本文"
+                required
+                value="${escapeHtml(item?.title)}"
+              />
             </label>
             <label class="field">
               <span>${isStory ? "Nivel" : "Artista"}</span>
@@ -580,7 +631,7 @@ function renderEditor(kind, item) {
                         )
                         .join("")}
                     </select>`
-                  : `<input name="artist" required value="${escapeHtml(item?.artist)}" />`
+                  : `<input name="artist" class="jp" lang="ja" spellcheck="false" autocomplete="off" required value="${escapeHtml(item?.artist)}" />`
               }
             </label>
           </div>

@@ -255,6 +255,15 @@ textarea {
   padding: 0.7rem 0.75rem;
 }
 
+input.jp,
+textarea.jp {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  letter-spacing: 0;
+  text-transform: none;
+  ime-mode: active;
+}
+
 textarea {
   min-height: 7rem;
   resize: vertical;

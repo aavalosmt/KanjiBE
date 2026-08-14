@@ -748,6 +748,14 @@ function renderImport() {
               <option value="lyric">Canción</option>
             </select>
           </label>
+          <label class="field">
+            <span>Modelo Gemini</span>
+            <select id="tokenize-model">
+              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+              <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+              <option value="gemini-2.0-pro-exp-02-05">gemini-2.0-pro-exp-02-05</option>
+            </select>
+          </label>
         </div>
         <label class="field">
           <span>Texto japonés</span>
@@ -781,6 +789,31 @@ function renderImport() {
   document.querySelectorAll(".import-panel").forEach((panel) => enablePlainPaste(panel));
 
   const textarea = document.querySelector("#import-json");
+  const modelSelect = document.querySelector("#tokenize-model");
+  const storedModel = localStorage.getItem("kanjibe.geminiModel");
+  void api("/api/admin/gemini/models")
+    .then((catalog) => {
+      const current = storedModel || catalog.default;
+      modelSelect.replaceChildren();
+      for (const id of catalog.models) {
+        const option = document.createElement("option");
+        option.value = id;
+        option.textContent = id;
+        if (id === current) option.selected = true;
+        modelSelect.append(option);
+      }
+      if (current && ![...modelSelect.options].some((item) => item.value === current)) {
+        const option = document.createElement("option");
+        option.value = current;
+        option.textContent = current;
+        option.selected = true;
+        modelSelect.prepend(option);
+      }
+    })
+    .catch(() => {
+      if (storedModel) modelSelect.value = storedModel;
+    });
+
   document.querySelector("#run-tokenize").addEventListener("click", async () => {
     const text = document.querySelector("#raw-jp").value.trim();
     if (!text) {
@@ -792,9 +825,11 @@ function renderImport() {
     button.textContent = "Tokenizando…";
     try {
       const kind = document.querySelector("#tokenize-kind").value;
+      const model = modelSelect.value;
+      localStorage.setItem("kanjibe.geminiModel", model);
       const data = await api("/api/admin/tokenize", {
         method: "POST",
-        body: JSON.stringify({ text, kind })
+        body: JSON.stringify({ text, kind, model })
       });
       textarea.value = JSON.stringify(data, null, 2);
       toast("JSON listo. Revísalo e importa.", "ok");

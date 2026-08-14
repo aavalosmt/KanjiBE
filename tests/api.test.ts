@@ -247,6 +247,11 @@ describe("admin tokenize", () => {
       .send({ text: "  " });
     expect(res.status).toBe(400);
   });
+
+  it("lists preferred models only when Gemini is not configured", async () => {
+    const res = await request(app).get("/api/admin/gemini/models").set(admin);
+    expect(res.status).toBe(503);
+  });
 });
 
 describe("admin import", () => {

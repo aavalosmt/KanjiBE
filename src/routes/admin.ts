@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
-import { parseJapaneseToKanjiBE } from "../lib/gemini.js";
+import { listGeminiModels, parseJapaneseToKanjiBE } from "../lib/gemini.js";
 import { serializeBlocks, toLyric, toStory } from "../lib/serialize.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
@@ -26,7 +26,18 @@ adminRouter.get("/session", (_req, res) => {
 
 const tokenizeSchema = z.object({
   text: z.string().trim().min(1),
-  kind: z.enum(["story", "lyric", "auto"]).default("auto")
+  kind: z.enum(["story", "lyric", "auto"]).default("auto"),
+  model: z.string().trim().min(1).optional()
+});
+
+adminRouter.get("/gemini/models", async (_req, res) => {
+  if (!config.geminiApiKey) {
+    res.status(503).json({ error: "GEMINI_API_KEY is not configured" });
+    return;
+  }
+
+  const catalog = await listGeminiModels();
+  res.json(catalog);
 });
 
 adminRouter.post("/tokenize", async (req, res) => {
@@ -36,8 +47,17 @@ adminRouter.post("/tokenize", async (req, res) => {
     return;
   }
 
-  const data = await parseJapaneseToKanjiBE(payload.text, payload.kind);
-  res.json(data);
+  try {
+    const data = await parseJapaneseToKanjiBE(
+      payload.text,
+      payload.kind,
+      payload.model
+    );
+    res.json(data);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Gemini request failed";
+    res.status(502).json({ error: message });
+  }
 });
 
 adminRouter.post("/import", async (req, res) => {

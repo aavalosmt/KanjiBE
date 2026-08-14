@@ -65,17 +65,79 @@ Reglas de content:
 9. No inventes ids ni coverUrl (usa null).
 10. No inventes imágenes.`;
 
+export const PREFERRED_GEMINI_MODELS = [
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-2.0-pro-exp-02-05",
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-1.5-pro",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-flash-8b"
+];
+
+function normalizeModelId(name: string): string {
+  return name.replace(/^models\//, "").trim();
+}
+
+function isGenerativeGemini(id: string, actions?: string[]): boolean {
+  if (!id.startsWith("gemini-")) return false;
+  if (/(embed|embedding|image|imagen|tts|live|robotics)/i.test(id)) return false;
+  if (actions && actions.length > 0) {
+    return actions.some((action) =>
+      /generateContent|generateContentStream|generateText/i.test(action)
+    );
+  }
+  return true;
+}
+
+export async function listGeminiModels(): Promise<{
+  models: string[];
+  default: string;
+}> {
+  const discovered = new Set<string>(PREFERRED_GEMINI_MODELS);
+
+  if (config.geminiApiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+      const pager = await ai.models.list();
+      for await (const model of pager) {
+        const id = normalizeModelId(model.name ?? "");
+        if (isGenerativeGemini(id, model.supportedActions)) {
+          discovered.add(id);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to list Gemini models", error);
+    }
+  }
+
+  const preferred = PREFERRED_GEMINI_MODELS.filter((id) => discovered.has(id));
+  const extras = [...discovered]
+    .filter((id) => !PREFERRED_GEMINI_MODELS.includes(id))
+    .sort();
+  const models = [...preferred, ...extras];
+  const fallback = models.includes("gemini-2.0-flash")
+    ? "gemini-2.0-flash"
+    : (models[0] ?? config.geminiModel);
+  const selected = models.includes(config.geminiModel) ? config.geminiModel : fallback;
+
+  return { models, default: selected };
+}
+
 export async function parseJapaneseToKanjiBE(
   rawText: string,
-  kind: "story" | "lyric" | "auto" = "auto"
+  kind: "story" | "lyric" | "auto" = "auto",
+  model = config.geminiModel
 ) {
   if (!config.geminiApiKey) {
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
+  const selected = normalizeModelId(model) || config.geminiModel;
   const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
   const response = await ai.models.generateContent({
-    model: config.geminiModel,
+    model: selected,
     contents: `kind=${kind}\n\n${rawText}`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,

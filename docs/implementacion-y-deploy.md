@@ -164,7 +164,33 @@ docker compose up --build
 
 Compose monta volúmenes para `/app/data` y `/app/uploads`.
 
-### Fase 1 — Primer hosting (recomendado para “servidor sencillo”)
+### Fase 1 — Railway
+
+El crash `Environment variable not found: DATABASE_URL` salía porque `prisma generate` corre en el **build**. Railway no inyecta las variables de runtime ahí. El Dockerfile / `postinstall` ya usan un default (`file:./data/kanji.db`) para poder generar el client.
+
+Después de pushear este cambio:
+
+1. En el servicio KanjiBE → **Variables**, añade:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `ADMIN_API_KEY` | secreto largo (la key del panel `/admin`) |
+   | `PUBLIC_BASE_URL` | `https://<tu-servicio>.up.railway.app` (sin slash final) |
+   | `DATABASE_URL` | `file:/app/data/kanji.db` |
+   | `UPLOAD_DIR` | `/app/data/uploads` |
+   | `NODE_ENV` | `production` |
+
+   No pongas `PORT`. Railway lo define y la app lo lee.
+
+2. **Settings → Networking → Generate domain.** Si dice *Unexposed service*, no hay URL pública.
+
+3. **Volumes:** monta un volume en `/app/data`. Sin eso, SQLite y las imágenes se borran en cada deploy. Replica = 1.
+
+4. Redeploy. Health check: `GET /health`. Panel: `https://<dominio>/admin/`.
+
+El warning de OpenSSL 1.1 en Alpine se evita con la image `node:20-bookworm-slim`.
+
+### Fase 1b — Otro host con disco
 
 Elegir un host **con disco persistente** y un solo proceso:
 
@@ -219,7 +245,7 @@ Solo cuando haga falta, no bloquean el primer deploy:
 
 ## 5. Checklist de un deploy concreto
 
-- [ ] Node 20 o image `node:20-alpine`
+- [ ] Node 20 o image `node:20-bookworm-slim`
 - [ ] `ADMIN_API_KEY` de producción, no commiteada
 - [ ] `PUBLIC_BASE_URL` = URL pública real
 - [ ] Volume (o Postgres + bucket si no hay disco)

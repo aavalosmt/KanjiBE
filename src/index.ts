@@ -11,8 +11,8 @@ if (config.databaseUrl.startsWith("file:")) {
 
 const app = createApp();
 
-const server = app.listen(config.port, () => {
-  console.log(`KanjiBE listening on ${config.publicBaseUrl}`);
+const server = app.listen(config.port, "0.0.0.0", () => {
+  console.log(`KanjiBE listening on ${config.publicBaseUrl} (port ${config.port})`);
 });
 
 async function shutdown() {

@@ -1,13 +1,5 @@
 import "dotenv/config";
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
-
 function numberEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) {
@@ -20,8 +12,8 @@ function numberEnv(name: string, fallback: number): number {
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: numberEnv("PORT", 3000),
-  databaseUrl: required("DATABASE_URL"),
-  adminApiKey: required("ADMIN_API_KEY"),
+  databaseUrl: process.env.DATABASE_URL ?? "file:./data/kanji.db",
+  adminApiKey: process.env.ADMIN_API_KEY ?? "",
   publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(
     /\/$/,
     ""
@@ -29,3 +21,9 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? "*",
   uploadDir: process.env.UPLOAD_DIR ?? "./uploads"
 };
+
+if (!config.adminApiKey && config.nodeEnv === "production") {
+  console.warn(
+    "ADMIN_API_KEY is not set. The API will start, but /admin writes will return 401."
+  );
+}

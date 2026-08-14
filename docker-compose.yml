@@ -8,11 +8,9 @@ services:
       ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-key}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
-      UPLOAD_DIR: /app/uploads
+      UPLOAD_DIR: /app/data/uploads
     volumes:
       - kanji-data:/app/data
-      - kanji-uploads:/app/uploads
 
 volumes:
   kanji-data:
-  kanji-uploads:

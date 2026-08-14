@@ -1,7 +1,4 @@
 # KanjiBE
-<<<<<<< HEAD
-The backend for KanjiPro app
-=======
 
 API REST de Node.js para el lector interactivo de historias y letras (japonés). El texto tokenizado con furigana se guarda tal cual; el alineado ruby es responsabilidad del cliente iOS.
 
@@ -52,41 +49,20 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
 - `DELETE /api/admin/lyrics/:id`
 - `POST /api/admin/upload` — `multipart/form-data` con campo `file` o `image`
 
-Ejemplo:
+## Hosting (Railway)
 
-```bash
-curl -X POST http://localhost:3000/api/admin/stories \
-  -H "Content-Type: application/json" \
-  -H "X-Admin-Key: dev-admin-key" \
-  -d @- <<'JSON'
-{
-  "title": "本文",
-  "level": "N3",
-  "translation": "Texto Principal",
-  "blocks": [
-    {
-      "type": "text",
-      "content": "[家族](furigana:か.ぞく)",
-      "translation": "Familia"
-    }
-  ]
-}
-JSON
-```
+El build de Prisma ya no exige `DATABASE_URL` en tiempo de imagen. Aun así, en **Variables** del servicio pon:
 
-## Hosting
+| Variable | Valor |
+| --- | --- |
+| `ADMIN_API_KEY` | un secreto tuyo |
+| `PUBLIC_BASE_URL` | la URL que te da Railway, sin slash final |
+| `DATABASE_URL` | `file:/app/data/kanji.db` |
+| `UPLOAD_DIR` | `/app/data/uploads` |
 
-La app lee todo de env (`PORT`, `DATABASE_URL`, `ADMIN_API_KEY`, `PUBLIC_BASE_URL`, `CORS_ORIGIN`, `UPLOAD_DIR`).
+Railway asigna `PORT` solo. En Settings genera un dominio público (el servicio sale como *Unexposed* hasta que lo hagas). Monta un Volume en `/app/data` si no quieres perder la DB en cada deploy.
 
-```bash
-docker compose up --build
-```
-
-Notas para cuando lo subas:
-
-- En un VPS o un plan con disco persistente, SQLite + el volumen de `uploads` es suficiente.
-- En hosting efímero (Render/Railway sin volume) cambia `DATABASE_URL` a Postgres y `provider` en `prisma/schema.prisma` a `postgresql`. Las imágenes conviene moverlas a un bucket después.
-- Pon `PUBLIC_BASE_URL` con la URL pública para que `/api/admin/upload` devuelva URLs absolutas.
+Detalle: [`docs/implementacion-y-deploy.md`](docs/implementacion-y-deploy.md).
 
 ## Tests
 
@@ -94,4 +70,3 @@ Notas para cuando lo subas:
 npx prisma generate
 npm test
 ```
->>>>>>> 5602165 (Initial setup)

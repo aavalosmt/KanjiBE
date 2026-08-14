@@ -1,6 +1,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { config } from "../config.js";
 import { importSchema, normalizeImportPayload } from "../validators.js";
+import type { z } from "zod";
+
+type ImportPayload = z.infer<typeof importSchema>;
 
 const blockSchema = {
   type: Type.OBJECT,
@@ -73,10 +76,15 @@ REGLAS DE TOKENIZACIÓN Y PALABRAS COMPUESTAS (CRÍTICO):
 5. Okurigana: la raíz en kanji, el kana de conjugación fuera del corchete.
    - [食](furigana:た)べる  [目指](furigana:め.ざ)した
 6. No pongas furigana en kana suelto ni en puntuación.
-7. Un bloque text por párrafo o verso. Usa header para estribillo/verso.
-8. Traducciones al español.
-9. Si kind=story, llena stories y deja lyrics []. Si kind=lyric, al revés. Si auto, decide.
-10. No inventes ids, coverUrl (usa null) ni imágenes.`;
+7. Un bloque text por cada línea original. Usa header para estribillo/verso.
+8. NUNCA insertes saltos de línea, \\n, <br> ni retornos de carro en content, translation, title, artist ni caption.
+   - Si el original es una sola línea, el content es una sola línea.
+   - Si el original tiene varias líneas, cada línea es un bloque distinto, no un \\n dentro del mismo content.
+   - INCORRECTO: "[飛翔](furigana:ひ.しょう)\\nたいたら"
+   - CORRECTO: un bloque "[飛翔](furigana:ひ.しょう)たいたら"  O  dos bloques, uno por verso
+9. Traducciones al español, también en una sola línea por bloque.
+10. Si kind=story, llena stories y deja lyrics []. Si kind=lyric, al revés. Si auto, decide.
+11. No inventes ids, coverUrl (usa null) ni imágenes.`;
 
 export const PREFERRED_GEMINI_MODELS = [
   "gemini-2.0-flash",
@@ -173,5 +181,41 @@ export async function parseJapaneseToKanjiBE(
     throw new Error("Gemini returned invalid JSON");
   }
 
-  return importSchema.parse(normalizeImportPayload(parsed));
+  return stripImportedNewlines(importSchema.parse(normalizeImportPayload(parsed)));
+}
+
+export function stripLineBreaks(value: string): string {
+  return value
+    .replace(/\\r\\n|\\n|\\r/g, "")
+    .replace(/\r\n|\r|\n/g, "")
+    .replace(/[\u2028\u2029]/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function cleanBlocks(blocks: ImportPayload["stories"][number]["blocks"]) {
+  return blocks.map((block) => ({
+    ...block,
+    content: block.content ? stripLineBreaks(block.content) : block.content,
+    translation: block.translation ? stripLineBreaks(block.translation) : block.translation,
+    caption: block.caption ? stripLineBreaks(block.caption) : block.caption
+  }));
+}
+
+function stripImportedNewlines(payload: ImportPayload): ImportPayload {
+  return {
+    stories: payload.stories.map((item) => ({
+      ...item,
+      title: stripLineBreaks(item.title),
+      translation: item.translation ? stripLineBreaks(item.translation) : item.translation,
+      blocks: cleanBlocks(item.blocks)
+    })),
+    lyrics: payload.lyrics.map((item) => ({
+      ...item,
+      title: stripLineBreaks(item.title),
+      artist: stripLineBreaks(item.artist),
+      translation: item.translation ? stripLineBreaks(item.translation) : item.translation,
+      blocks: cleanBlocks(item.blocks)
+    }))
+  };
 }

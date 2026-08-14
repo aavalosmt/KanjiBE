@@ -4,7 +4,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: file:/app/data/kanji.db
+      DATABASE_URL: file:./data/kanji.db
       ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-key}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}

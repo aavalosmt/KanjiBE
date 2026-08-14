@@ -178,7 +178,7 @@ Después de pushear este cambio:
    | --- | --- |
    | `ADMIN_API_KEY` | secreto largo (la key del panel `/admin`) |
    | `PUBLIC_BASE_URL` | `https://<tu-servicio>.up.railway.app` (sin slash final) |
-   | `DATABASE_URL` | `file:/app/data/kanji.db` |
+   | `DATABASE_URL` | `file:./data/kanji.db` |
    | `UPLOAD_DIR` | `/app/data/uploads` |
    | `NODE_ENV` | `production` |
 
@@ -208,7 +208,7 @@ Pasos:
    | --- | --- |
    | `NODE_ENV` | `production` |
    | `PORT` | el que asigne el host, o `3000` |
-   | `DATABASE_URL` | `file:/app/data/kanji.db` (o la ruta del volume) |
+   | `DATABASE_URL` | `file:./data/kanji.db` |
    | `ADMIN_API_KEY` | secreto largo, no el de desarrollo |
    | `PUBLIC_BASE_URL` | `https://api.tudominio.com` (sin slash final) |
    | `CORS_ORIGIN` | `*` está bien para la app nativa; restringir si hay panel web |

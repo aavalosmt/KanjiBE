@@ -9,10 +9,15 @@ function numberEnv(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+const sqliteUrl =
+  process.env.NODE_ENV === "test"
+    ? (process.env.DATABASE_URL ?? "file:./data/test.db")
+    : "file:./data/kanji.db";
+
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: numberEnv("PORT", 3000),
-  databaseUrl: process.env.DATABASE_URL ?? "file:./data/kanji.db",
+  databaseUrl: sqliteUrl,
   adminApiKey: process.env.ADMIN_API_KEY ?? "",
   publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(
     /\/$/,

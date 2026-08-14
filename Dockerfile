@@ -22,7 +22,7 @@ RUN npx prisma generate && npm run build
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV DATABASE_URL="file:/app/data/kanji.db"
+ENV DATABASE_URL="file:./data/kanji.db"
 ENV UPLOAD_DIR=/app/data/uploads
 
 RUN mkdir -p /app/data /app/data/uploads

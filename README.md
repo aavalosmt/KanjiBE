@@ -57,7 +57,7 @@ El build de Prisma ya no exige `DATABASE_URL` en tiempo de imagen. Aun así, en 
 | --- | --- |
 | `ADMIN_API_KEY` | un secreto tuyo |
 | `PUBLIC_BASE_URL` | la URL que te da Railway, sin slash final |
-| `DATABASE_URL` | `file:/app/data/kanji.db` |
+| `DATABASE_URL` | `file:./data/kanji.db` |
 | `UPLOAD_DIR` | `/app/data/uploads` |
 
 Railway asigna `PORT` solo. En Settings genera un dominio público (el servicio sale como *Unexposed* hasta que lo hagas). Monta un Volume en `/app/data` si no quieres perder la DB en cada deploy.

@@ -572,6 +572,26 @@ function blocksFromDom(root) {
   });
 }
 
+function blockForJsonView(block, kind) {
+  if (block.type === "image") {
+    return {
+      ...(block.id ? { id: block.id } : {}),
+      type: "image",
+      url: block.url || "",
+      caption: block.caption ?? null,
+      translation: block.translation ?? null
+    };
+  }
+  const view = {
+    ...(block.id ? { id: block.id } : {}),
+    type: block.type,
+    content: block.content || "",
+    translation: block.translation ?? null
+  };
+  if (kind === "lyrics") view.startTime = block.startTime ?? null;
+  return view;
+}
+
 function collectForm(form, { strict = false } = {}) {
   const fullJsonWrap = document.querySelector("#full-json-wrap");
   const fullJsonField = document.querySelector("#full-json");
@@ -802,14 +822,14 @@ function bindEditor(kind, isNew, id) {
       const obj = {
         title: data.title || "",
         translation: data.translation || null,
-        coverUrl: data.coverUrl || null,
-        blocks
+        coverUrl: data.coverUrl || null
       };
-      if (kind === "stories") obj.level = data.level;
+      if (kind === "stories") obj.level = data.level || null;
       else {
         obj.artist = data.artist || "";
         obj.youtubeUrl = data.youtubeUrl || null;
       }
+      obj.blocks = blocks.map((block) => blockForJsonView(block, kind));
       fullJsonField.value = JSON.stringify(obj, null, 2);
       formFields.classList.add("hidden");
       fullJsonWrap.classList.remove("hidden");

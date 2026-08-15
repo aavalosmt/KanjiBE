@@ -86,6 +86,7 @@ export const lyricCreateSchema = z.object({
   id: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1),
   artist: z.string().trim().min(1),
+  level: nullableText,
   translation: nullableText,
   coverUrl: nullableText,
   youtubeUrl,
@@ -96,6 +97,7 @@ export const lyricUpdateSchema = z
   .object({
     title: optionalText,
     artist: optionalText,
+    level: nullableText,
     translation: nullableText,
     coverUrl: nullableText,
     youtubeUrl,

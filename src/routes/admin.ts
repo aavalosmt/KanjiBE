@@ -175,6 +175,7 @@ adminRouter.post("/import", async (req, res) => {
       const data = {
         title: item.title,
         artist: item.artist,
+        level: item.level ?? null,
         translation: item.translation ?? null,
         coverUrl: item.coverUrl ?? null,
         youtubeUrl: item.youtubeUrl ?? null,
@@ -277,6 +278,7 @@ adminRouter.post("/lyrics", async (req, res) => {
         id: payload.id,
         title: payload.title,
         artist: payload.artist,
+        level: payload.level ?? null,
         translation: payload.translation ?? null,
         coverUrl: payload.coverUrl ?? null,
         youtubeUrl: payload.youtubeUrl ?? null,
@@ -308,6 +310,7 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
       data: {
         title: payload.title,
         artist: payload.artist,
+        level: payload.level,
         translation: payload.translation,
         coverUrl: payload.coverUrl,
         youtubeUrl: payload.youtubeUrl,

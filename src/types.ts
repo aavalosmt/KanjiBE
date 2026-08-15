@@ -41,6 +41,7 @@ export type LyricSummary = {
   id: string;
   title: string;
   artist: string;
+  level: string | null;
   translation: string | null;
   coverUrl: string | null;
   youtubeUrl: string | null;

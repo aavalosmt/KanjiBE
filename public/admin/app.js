@@ -822,10 +822,10 @@ function bindEditor(kind, isNew, id) {
       const obj = {
         title: data.title || "",
         translation: data.translation || null,
-        coverUrl: data.coverUrl || null
+        coverUrl: data.coverUrl || null,
+        level: data.level || null
       };
-      if (kind === "stories") obj.level = data.level || null;
-      else {
+      if (kind !== "stories") {
         obj.artist = data.artist || "";
         obj.youtubeUrl = data.youtubeUrl || null;
       }
@@ -847,6 +847,7 @@ function bindEditor(kind, isNew, id) {
       if (kind === "stories") {
         if (parsed.level) form.elements.level.value = parsed.level;
       } else {
+        form.elements.level.value = parsed.level || "";
         form.elements.artist.value = parsed.artist || "";
         form.elements.youtubeUrl.value = parsed.youtubeUrl || "";
       }
@@ -977,6 +978,7 @@ function bindEditor(kind, isNew, id) {
     if (kind === "stories") payload.level = data.level;
     else {
       payload.artist = data.artist;
+      payload.level = data.level || null;
       payload.youtubeUrl = data.youtubeUrl || null;
     }
 
@@ -1097,6 +1099,22 @@ function renderEditor(kind, item) {
               : `<label class="field">
             <span>YouTube</span>
             <input name="youtubeUrl" value="${escapeHtml(item?.youtubeUrl)}" placeholder="https://youtu.be/…" />
+          </label>`
+          }
+          ${
+            isStory
+              ? ""
+              : `<label class="field">
+            <span>Nivel JLPT (opcional)</span>
+            <select name="level">
+              <option value="" ${!item?.level ? "selected" : ""}>Sin clasificar</option>
+              ${["N5", "N4", "N3", "N2", "N1"]
+                .map(
+                  (level) =>
+                    `<option ${item?.level === level ? "selected" : ""}>${level}</option>`
+                )
+                .join("")}
+            </select>
           </label>`
           }
           ${

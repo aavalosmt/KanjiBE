@@ -72,6 +72,7 @@ type LyricRecord = {
   id: string;
   title: string;
   artist: string;
+  level?: string | null;
   translation: string | null;
   coverUrl: string | null;
   youtubeUrl?: string | null;
@@ -104,6 +105,7 @@ export function toLyricSummary(lyric: LyricRecord): LyricSummary {
     id: lyric.id,
     title: lyric.title,
     artist: lyric.artist,
+    level: lyric.level ?? null,
     translation: lyric.translation,
     coverUrl: lyric.coverUrl,
     youtubeUrl: lyric.youtubeUrl ?? null

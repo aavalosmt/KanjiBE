@@ -40,6 +40,11 @@ const lyricSchema = {
     artist: { type: Type.STRING },
     translation: { type: Type.STRING },
     coverUrl: { type: Type.STRING, nullable: true },
+    youtubeUrl: {
+      type: Type.STRING,
+      nullable: true,
+      description: "YouTube URL only if the user provided one. Otherwise null."
+    },
     blocks: { type: Type.ARRAY, items: blockSchema }
   },
   required: ["title", "artist", "blocks"]
@@ -97,7 +102,7 @@ REGLAS (CRÍTICO):
 
 7. Traducción al español de la línea (no de cada kanji).
 8. kind=story → solo stories. kind=lyric → solo lyrics. auto → decide.
-9. No inventes ids, coverUrl (null) ni imágenes.`;
+9. No inventes ids, coverUrl, youtubeUrl ni imágenes. youtubeUrl solo si el texto trae un link de YouTube; si no, null.`;
 
 export const PREFERRED_GEMINI_MODELS = [
   "gemini-2.0-flash",

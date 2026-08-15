@@ -33,7 +33,7 @@ Si mandas `id` y ya existe, se actualiza. Si no hay `id`, se crea uno nuevo.
 
 ## Lyric
 
-Igual, pero `artist` en vez de `level`.
+Igual, pero `artist` en vez de `level`. `youtubeUrl` es opcional (`https://youtu.be/…` o `youtube.com/watch?v=`).
 
 ## Bloques
 

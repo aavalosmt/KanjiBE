@@ -5,6 +5,17 @@ import type { ContentBlock } from "./types.js";
 const optionalText = z.string().trim().min(1).optional();
 const nullableText = z.string().trim().min(1).nullable().optional();
 
+const youtubeUrl = z
+  .string()
+  .trim()
+  .nullable()
+  .optional()
+  .refine(
+    (value) =>
+      !value || /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(value),
+    { message: "Must be a YouTube URL" }
+  );
+
 export const blockTokenSchema = z.object({
   surface: z.string(),
   lemma: z.string(),
@@ -72,6 +83,7 @@ export const lyricCreateSchema = z.object({
   artist: z.string().trim().min(1),
   translation: nullableText,
   coverUrl: nullableText,
+  youtubeUrl,
   blocks: z.array(blockSchema).default([])
 });
 
@@ -81,6 +93,7 @@ export const lyricUpdateSchema = z
     artist: optionalText,
     translation: nullableText,
     coverUrl: nullableText,
+    youtubeUrl,
     blocks: z.array(blockSchema).optional()
   })
   .refine((value) => Object.keys(value).length > 0, {

@@ -24,6 +24,7 @@ model Lyric {
   artist      String
   translation String?
   coverUrl    String?
+  youtubeUrl  String?
   blocks      String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

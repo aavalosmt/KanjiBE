@@ -18,7 +18,8 @@ lyricsRouter.get("/", async (req, res) => {
         title: true,
         artist: true,
         translation: true,
-        coverUrl: true
+        coverUrl: true,
+        youtubeUrl: true
       }
     }),
     prisma.lyric.count()

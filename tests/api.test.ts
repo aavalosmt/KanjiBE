@@ -151,7 +151,8 @@ describe("public lyrics", () => {
     expect(list.body.data[0]).toMatchObject({
       id: "song-456",
       title: "Brave Heart",
-      artist: "Ayumi Miyazaki"
+      artist: "Ayumi Miyazaki",
+      youtubeUrl: null
     });
     expect(list.body.data[0]).not.toHaveProperty("blocks");
 
@@ -215,8 +216,12 @@ describe("admin lyrics", () => {
     const created = await request(app)
       .post("/api/admin/lyrics")
       .set(admin)
-      .send(lyricPayload);
+      .send({
+        ...lyricPayload,
+        youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      });
     expect(created.status).toBe(201);
+    expect(created.body.youtubeUrl).toContain("youtube.com");
 
     const updated = await request(app)
       .put("/api/admin/lyrics/song-456")

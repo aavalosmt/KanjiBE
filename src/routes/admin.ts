@@ -101,6 +101,7 @@ adminRouter.post("/import", async (req, res) => {
         artist: item.artist,
         translation: item.translation ?? null,
         coverUrl: item.coverUrl ?? null,
+        youtubeUrl: item.youtubeUrl ?? null,
         blocks: await persistBlocks(item.blocks)
       };
       if (item.id) {
@@ -202,6 +203,7 @@ adminRouter.post("/lyrics", async (req, res) => {
         artist: payload.artist,
         translation: payload.translation ?? null,
         coverUrl: payload.coverUrl ?? null,
+        youtubeUrl: payload.youtubeUrl ?? null,
         blocks: await persistBlocks(payload.blocks)
       }
     });
@@ -226,6 +228,7 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
         artist: payload.artist,
         translation: payload.translation,
         coverUrl: payload.coverUrl,
+        youtubeUrl: payload.youtubeUrl,
         blocks: payload.blocks ? await persistBlocks(payload.blocks) : undefined
       }
     });

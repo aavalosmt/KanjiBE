@@ -20,9 +20,19 @@ async function tableNames(): Promise<string[]> {
   return tables.map((table) => table.name);
 }
 
+async function hasColumn(table: string, column: string): Promise<boolean> {
+  const cols = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+    `PRAGMA table_info("${table}")`
+  );
+  return cols.some((col) => col.name === column);
+}
+
 async function ensureTables() {
   const names = new Set(await tableNames());
   if (names.has("Story") && names.has("Lyric")) {
+    if (!(await hasColumn("Lyric", "youtubeUrl"))) {
+      await prisma.$executeRawUnsafe(`ALTER TABLE "Lyric" ADD COLUMN "youtubeUrl" TEXT`);
+    }
     return;
   }
 
@@ -46,6 +56,7 @@ async function ensureTables() {
       "artist" TEXT NOT NULL,
       "translation" TEXT,
       "coverUrl" TEXT,
+      "youtubeUrl" TEXT,
       "blocks" TEXT NOT NULL,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL

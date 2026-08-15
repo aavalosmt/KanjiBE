@@ -34,7 +34,7 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/stories?page=1&limit=20&level=N3`
 - `GET /api/stories/:id`
 - `GET /api/lyrics?page=1&limit=20`
-- `GET /api/lyrics/:id`
+- `GET /api/lyrics/:id` — incluye `youtubeUrl` si la canción tiene video
 - `GET /health`
 - `GET /api/lookup?q=知らない` — lematiza (知る) y describe el verbo en inglés (`godan verb 知る in the negative form`). También `GET /api/lookup/知らない`.
 - `POST /api/analyze` `{ "text" | "content" }` — análisis morfológico de un bloque (POS + color). Agrupa verbo + auxiliares (`食べました`). Acepta markup `[家族](furigana:か.ぞく)`.

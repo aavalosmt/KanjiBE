@@ -386,6 +386,15 @@ function renderPreview(kind, form) {
     pane.append(img);
   }
 
+  if (data.youtubeUrl) {
+    const link = document.createElement("a");
+    link.href = data.youtubeUrl;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = "YouTube";
+    pane.append(link);
+  }
+
   for (const block of blocks) {
     if (block.type === "header") {
       const h = document.createElement("h2");
@@ -561,7 +570,10 @@ function bindEditor(kind, isNew, id) {
       )
     };
     if (kind === "stories") payload.level = data.level;
-    else payload.artist = data.artist;
+    else {
+      payload.artist = data.artist;
+      payload.youtubeUrl = data.youtubeUrl || null;
+    }
 
     try {
       if (isNew) {
@@ -650,6 +662,14 @@ function renderEditor(kind, item) {
               <button class="ghost" id="upload-cover" type="button">Subir</button>
             </div>
           </label>
+          ${
+            isStory
+              ? ""
+              : `<label class="field">
+            <span>YouTube</span>
+            <input name="youtubeUrl" value="${escapeHtml(item?.youtubeUrl)}" placeholder="https://youtu.be/…" />
+          </label>`
+          }
           <div class="row">
             <h2>Bloques</h2>
           </div>

@@ -78,7 +78,7 @@ Dos tablas planas. Los bloques van en una columna `blocks` (texto JSON) para pre
 
 **Story:** `id`, `title`, `level`, `translation`, `coverUrl`, `blocks`, `createdAt`, `updatedAt`
 
-**Lyric:** `id`, `title`, `artist`, `translation`, `coverUrl`, `blocks`, `createdAt`, `updatedAt`
+**Lyric:** `id`, `title`, `artist`, `translation`, `coverUrl`, `youtubeUrl`, `blocks`, `createdAt`, `updatedAt`
 
 Cada bloque:
 

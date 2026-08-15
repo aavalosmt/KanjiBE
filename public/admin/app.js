@@ -719,8 +719,8 @@ Forma:
 }
 
 blocks: array de { "type": "text"|"header"|"image", "content"?, "translation"?, "url"?, "caption"? }
-- Agrupa jukugo: [飛翔](furigana:ひ.しょう) [飛行機](furigana:ひ.こう.き) NO [飛][翔]
-- Okurigana: [食](furigana:た)べる
+- Palabra completa: [掴め](furigana:つか.め) [飛行機](furigana:ひ.こう.き) [知らない](furigana:し.ら.な.い)
+- NO kanji suelto: [掴](furigana:つか)め
 - image: url absoluta
 level: N5|N4|N3|N2|N1
 No inventes ids. coverUrl puede ser null.`;

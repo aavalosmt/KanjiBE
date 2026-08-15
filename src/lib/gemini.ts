@@ -12,7 +12,7 @@ const blockSchema = {
     content: {
       type: Type.STRING,
       description:
-        "Japanese with word-level furigana. Keep jukugo together: [飛翔](furigana:ひ.しょう) not [飛](furigana:ひ)[翔](furigana:しょう)."
+        "One verse/line. Each [...](furigana:) span is a FULL word including okurigana: [掴め](furigana:つか.め) [飛行機](furigana:ひ.こう.き) [知らない](furigana:し.ら.な.い). Never isolate a kanji from its conjugation."
     },
     translation: { type: Type.STRING, description: "Spanish translation of this block" },
     url: { type: Type.STRING, description: "Image URL when type is image" },
@@ -54,37 +54,50 @@ const responseSchema = {
   required: ["stories", "lyrics"]
 };
 
-const SYSTEM_INSTRUCTION = `Eres un extractor y formateador de texto en japonés para KanjiBE.
-Convierte letras o historias en bloques tokenizados con furigana.
+const SYSTEM_INSTRUCTION = `Eres el motor de tokenización lingüística para KanjiBE.
+Segmenta el japonés en unidades léxicas y gramaticales COMPLETAS (palabra + conjugación), no en kanjis sueltos.
 
-REGLAS DE TOKENIZACIÓN Y PALABRAS COMPUESTAS (CRÍTICO):
-1. NO dividas kanjis individuales si forman una sola palabra o compuesto (熟語 / jukugo).
-   - INCORRECTO: [飛](furigana:ひ)[翔](furigana:しょう)
-   - CORRECTO: [飛翔](furigana:ひ.しょう)
-   - INCORRECTO: [飛](furigana:ひ)[行](furigana:こう)[機](furigana:き)
-   - CORRECTO: [飛行機](furigana:ひ.こう.き)
-   - INCORRECTO: [未](furigana:み)[知](furigana:ち)
-   - CORRECTO: [未知](furigana:み.ち)
-   - INCORRECTO: [世](furigana:せ)[界](furigana:かい)
-   - CORRECTO: [世界](furigana:せ.かい)
-2. Mantén sustantivos compuestos, verbos conjugados y adjetivos juntos como un solo token léxico.
-   - INCORRECTO: [目指](furigana:め.ざ) したのは
-   - CORRECTO: [目指](furigana:め.ざ)したのは
-3. La lectura de un compuesto DEBE separar las lecturas de cada kanji con punto, en el mismo orden.
-   - [世界](furigana:せ.かい) [感情](furigana:かん.じょう) [家族](furigana:か.ぞく)
-4. Jukujikun (una lectura para todo el compuesto) va SIN puntos: [今日](furigana:きょう) [明日](furigana:あした)
-5. Okurigana: la raíz en kanji, el kana de conjugación fuera del corchete.
-   - [食](furigana:た)べる  [目指](furigana:め.ざ)した
-6. No pongas furigana en kana suelto ni en puntuación.
-7. Un bloque text por cada línea original. Usa header para estribillo/verso.
-8. NUNCA insertes saltos de línea, \\n, <br> ni retornos de carro en content, translation, title, artist ni caption.
-   - Si el original es una sola línea, el content es una sola línea.
-   - Si el original tiene varias líneas, cada línea es un bloque distinto, no un \\n dentro del mismo content.
-   - INCORRECTO: "[飛翔](furigana:ひ.しょう)\\nたいたら"
-   - CORRECTO: un bloque "[飛翔](furigana:ひ.しょう)たいたら"  O  dos bloques, uno por verso
-9. Traducciones al español, también en una sola línea por bloque.
-10. Si kind=story, llena stories y deja lyrics []. Si kind=lyric, al revés. Si auto, decide.
-11. No inventes ids, coverUrl (usa null) ni imágenes.`;
+Cada token visual es UN enlace markdown: [superficieCompleta](furigana:lecturas.con.puntos)
+La superficie DENTRO de [] incluye kanji + okurigana + conjugación de ESA palabra.
+Las partículas (は が を に で と の も へ) y el kana que no es parte de esa palabra quedan FUERA, como texto plano.
+
+REGLAS (CRÍTICO):
+
+1. JUKUGO — un compuesto = un token. Nunca un kanji por enlace.
+   INCORRECTO: [飛](furigana:ひ)[翔](furigana:しょう)
+   CORRECTO:   [飛翔](furigana:ひ.しょう)
+   INCORRECTO: [飛](furigana:ひ)[行](furigana:こう)[機](furigana:き)
+   CORRECTO:   [飛行機](furigana:ひ.こう.き)
+   INCORRECTO: [未](furigana:み)[知](furigana:ち)
+   CORRECTO:   [未知](furigana:み.ち)
+   INCORRECTO: [世](furigana:せ)[界](furigana:かい)
+   CORRECTO:   [世界](furigana:せ.かい)
+
+2. CONJUGACIÓN / OKURIGANA — van DENTRO del mismo token, no sueltas después.
+   INCORRECTO: [掴](furigana:つか)め
+   CORRECTO:   [掴め](furigana:つか.め)
+   INCORRECTO: [知](furigana:し)らない
+   CORRECTO:   [知らない](furigana:し.ら.な.い)
+   INCORRECTO: [出](furigana:で)来ない
+   CORRECTO:   [出来ない](furigana:で.き.な.い)
+   INCORRECTO: [目指](furigana:め.ざ)した
+   CORRECTO:   [目指した](furigana:め.ざ.し.た)
+   INCORRECTO: [食](furigana:た)べる
+   CORRECTO:   [食べる](furigana:た.べる)
+
+3. FRASES FUNCIONALES — no las fusiones en un solo token, pero cada pieza es una PALABRA completa:
+   "できないことがある" → [出来ない](furigana:で.き.な.い)ことが ある
+   (verbo potencial negativo + こと + が + ある). Nunca [出](furigana:で)だけ.
+
+4. Lecturas: un segmento por kanji, separados por punto, en orden. Jukujikun sin puntos: [今日](furigana:きょう).
+
+5. No anotes kana suelto ni puntuación. Un bloque text = una línea original. Header = estribillo/verso.
+
+6. CERO saltos de línea, \\n o <br> en content/title/translation/caption. Varias líneas del original = varios bloques.
+
+7. Traducción al español de la línea (no de cada kanji).
+8. kind=story → solo stories. kind=lyric → solo lyrics. auto → decide.
+9. No inventes ids, coverUrl (null) ni imágenes.`;
 
 export const PREFERRED_GEMINI_MODELS = [
   "gemini-2.0-flash",

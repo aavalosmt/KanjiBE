@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { IpadicFeatures, Tokenizer } from "kuromoji";
+import { describeGrammar, posEnglish, type GrammarInfo } from "./grammar.js";
 
 const require = createRequire(import.meta.url);
 const kuromoji = require("kuromoji") as typeof import("kuromoji");
@@ -43,8 +44,13 @@ export type LookupResult = {
   lemmas: string[];
   reading: string | null;
   pos: string | null;
+  posEn: string | null;
   conjugatedType: string | null;
   conjugatedForm: string | null;
+  verbClassEn: string | null;
+  formEn: string | null;
+  inflectionEn: string | null;
+  grammarEn: string | null;
   lookupKeys: string[];
   tokens: LookupToken[];
 };
@@ -85,6 +91,7 @@ export function analyzeTokens(query: string, raw: IpadicFeatures[]): LookupResul
   ];
 
   const lookupKeys = [...new Set([query, ...lemmas].filter(Boolean))];
+  const grammar: GrammarInfo = describeGrammar(raw);
 
   return {
     query,
@@ -92,10 +99,15 @@ export function analyzeTokens(query: string, raw: IpadicFeatures[]): LookupResul
     lemmas,
     reading: primary?.reading && !isBlank(primary.reading) ? primary.reading : null,
     pos: primary?.pos ?? null,
+    posEn: grammar.posEn ?? posEnglish(primary?.pos ?? null),
     conjugatedType:
       primary && !isBlank(primary.conjugated_type) ? primary.conjugated_type : null,
     conjugatedForm:
       primary && !isBlank(primary.conjugated_form) ? primary.conjugated_form : null,
+    verbClassEn: grammar.verbClassEn,
+    formEn: grammar.formEn,
+    inflectionEn: grammar.inflectionEn,
+    grammarEn: grammar.grammarEn,
     lookupKeys,
     tokens
   };

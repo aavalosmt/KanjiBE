@@ -55,13 +55,20 @@ describe("GET /api/lookup lemmatize", () => {
     expect(unknown.status).toBe(200);
     expect(unknown.body.lemma).toBe("知る");
     expect(unknown.body.lookupKeys).toContain("知る");
+    expect(unknown.body.posEn).toBe("verb");
+    expect(unknown.body.verbClassEn).toMatch(/godan/i);
+    expect(unknown.body.inflectionEn).toMatch(/negative/i);
+    expect(unknown.body.grammarEn).toMatch(/知る/);
 
     const te = await request(app).get("/api/lookup").query({ q: "食べて" });
     expect(te.status).toBe(200);
     expect(te.body.lemma).toBe("食べる");
+    expect(te.body.verbClassEn).toMatch(/ichidan/i);
+    expect(te.body.inflectionEn).toMatch(/te-form/i);
 
     const masu = await request(app).get("/api/lookup").query({ q: "行きます" });
     expect(masu.status).toBe(200);
     expect(masu.body.lemma).toBe("行く");
+    expect(masu.body.inflectionEn).toMatch(/polite|masu/i);
   }, 20_000);
 });

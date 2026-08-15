@@ -36,7 +36,7 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/lyrics?page=1&limit=20`
 - `GET /api/lyrics/:id`
 - `GET /health`
-- `GET /api/lookup?q=知らない` — lematiza con Kuromoji (知る). También `GET /api/lookup/知らない`.
+- `GET /api/lookup?q=知らない` — lematiza (知る) y describe el verbo en inglés (`godan verb 知る in the negative form`). También `GET /api/lookup/知らない`.
 - `POST /api/analyze` `{ "text" | "content" }` — análisis morfológico de un bloque (POS + color). Agrupa verbo + auxiliares (`食べました`). Acepta markup `[家族](furigana:か.ぞく)`.
 
 Las listas no incluyen `blocks`. El detalle sí, con traducciones y en el orden guardado.

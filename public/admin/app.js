@@ -181,6 +181,7 @@ function layout(active, body) {
       <nav class="nav">
         <a href="#/stories" class="${active === "stories" ? "active" : ""}">Historias</a>
         <a href="#/lyrics" class="${active === "lyrics" ? "active" : ""}">Letras</a>
+        <a href="#/search" class="${active === "search" ? "active" : ""}">Buscar</a>
         <a href="#/import" class="${active === "import" ? "active" : ""}">Importar</a>
         <button class="ghost" id="logout" type="button">Salir</button>
       </nav>
@@ -231,6 +232,77 @@ function coverMarkup(url) {
   return `<img class="cover" src="${escapeHtml(url)}" alt="" />`;
 }
 
+function formatTime(seconds) {
+  const total = Math.max(0, Number(seconds) || 0);
+  const m = Math.floor(total / 60);
+  const s = (total % 60).toFixed(2).padStart(5, "0");
+  return `${String(m).padStart(2, "0")}:${s}`;
+}
+
+async function showLrcPreview(id, host) {
+  host.insertAdjacentHTML(
+    "beforeend",
+    `<div id="lrc-preview" class="preview-card search-panel"><p class="muted">Cargando letra…</p></div>`
+  );
+  const pane = host.querySelector("#lrc-preview") ?? host;
+  try {
+    const preview = await api(`/api/admin/lrclib/preview?id=${id}`);
+    const langClass = preview.language.japanese ? "ok" : "error";
+    pane.outerHTML = `
+      <section id="lrc-preview" class="preview-card">
+        <div class="kicker">${escapeHtml(preview.language.label)}</div>
+        <h2>${escapeHtml(preview.title)}</h2>
+        <p class="muted">${escapeHtml(preview.artist)}${preview.album ? ` · ${escapeHtml(preview.album)}` : ""}</p>
+        <p class="muted">${preview.synced ? "Con timestamps" : "Sin timestamps"} · ${preview.lineCount} líneas</p>
+        ${preview.language.japanese ? "" : `<p class="muted">Esto no parece japonés. No la guardes si buscabas JP.</p>`}
+        <ol class="lyric-preview">
+          ${preview.lines
+            .map(
+              (line) =>
+                `<li><span class="muted">${formatTime(line.startTime)}</span> ${escapeHtml(line.text)}</li>`
+            )
+            .join("")}
+        </ol>
+        <label class="field">
+          <span>YouTube (opcional)</span>
+          <input id="lrc-youtube" placeholder="https://youtu.be/…" />
+        </label>
+        <div class="actions">
+          <button class="primary" id="lrc-save" type="button" ${preview.lineCount ? "" : "disabled"}>
+            Sí, guardar esta
+          </button>
+          <button class="ghost" id="lrc-cancel" type="button">Otra</button>
+        </div>
+      </section>
+    `;
+    document.querySelector("#lrc-cancel")?.addEventListener("click", () => {
+      document.querySelector("#lrc-preview")?.remove();
+    });
+    document.querySelector("#lrc-save")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.textContent = "Guardando…";
+      try {
+        const youtubeUrl = document.querySelector("#lrc-youtube")?.value.trim() || null;
+        const created = await api("/api/admin/lrclib/import", {
+          method: "POST",
+          body: JSON.stringify({ id: preview.id, youtubeUrl })
+        });
+        toast("Canción guardada", "ok");
+        go(`/lyrics/${created.id}`);
+      } catch (error) {
+        toast(error.message, "error");
+        button.disabled = false;
+        button.textContent = "Sí, guardar esta";
+      }
+    });
+    void langClass;
+  } catch (error) {
+    toast(error.message, "error");
+    document.querySelector("#lrc-preview")?.remove();
+  }
+}
+
 function bindLrcLibSearch() {
   const input = document.querySelector("#lrclib-q");
   const results = document.querySelector("#lrclib-results");
@@ -258,26 +330,13 @@ function bindLrcLibSearch() {
             <p class="muted">${escapeHtml(track.artist)}${track.album ? ` · ${escapeHtml(track.album)}` : ""}</p>
             <p class="muted">${track.synced ? "synced" : track.hasLyrics ? "letra plana" : "sin letra"}</p>
           </div>
-          <button class="primary" data-import="${track.id}" type="button" ${track.hasLyrics ? "" : "disabled"}>Importar</button>
+          <button class="ghost" data-preview="${track.id}" type="button" ${track.hasLyrics ? "" : "disabled"}>Ver letra</button>
         </article>`
         )
         .join("");
-      results.querySelectorAll("[data-import]").forEach((button) => {
-        button.addEventListener("click", async () => {
-          button.disabled = true;
-          button.textContent = "Importando…";
-          try {
-            const created = await api("/api/admin/lrclib/import", {
-              method: "POST",
-              body: JSON.stringify({ id: Number(button.dataset.import) })
-            });
-            toast("Canción importada", "ok");
-            go(`/lyrics/${created.id}`);
-          } catch (error) {
-            toast(error.message, "error");
-            button.disabled = false;
-            button.textContent = "Importar";
-          }
+      results.querySelectorAll("[data-preview]").forEach((button) => {
+        button.addEventListener("click", () => {
+          void showLrcPreview(Number(button.dataset.preview), results);
         });
       });
     } catch (error) {
@@ -998,6 +1057,33 @@ async function route() {
     if (section === "lyrics" && !id) {
       const list = await api("/api/lyrics?limit=100");
       renderList("lyrics", list.data);
+      return;
+    }
+    if (section === "search") {
+      app.innerHTML = layout(
+        "search",
+        `
+        <div class="row">
+          <div>
+            <div class="kicker">LRCLib</div>
+            <h1>Buscar canción</h1>
+            <p class="muted">Revisa la letra y el idioma antes de guardar. Nada se escribe en la base hasta que confirmes.</p>
+          </div>
+        </div>
+        <section class="editor pad search-panel">
+          <label class="field">
+            <span>Artista o título</span>
+            <div class="cover-row">
+              <input id="lrclib-q" placeholder="Blue Bird Ikimonogakari" />
+              <button class="primary" id="lrclib-search" type="button">Buscar</button>
+            </div>
+          </label>
+          <div id="lrclib-results"></div>
+        </section>
+      `
+      );
+      bindLogout();
+      bindLrcLibSearch();
       return;
     }
     if (section === "import") {

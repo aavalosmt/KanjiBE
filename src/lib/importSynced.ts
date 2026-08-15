@@ -4,6 +4,48 @@ import { persistBlocks } from "./serialize.js";
 import type { z } from "zod";
 import type { blockSchema } from "../validators.js";
 
+export function detectLyricLanguage(text: string): {
+  code: string;
+  label: string;
+  japanese: boolean;
+} {
+  if (/[\u3040-\u30ff\u4e00-\u9faf]/.test(text)) {
+    return { code: "ja", label: "Japanese", japanese: true };
+  }
+  if (/[\uac00-\ud7af]/.test(text)) {
+    return { code: "ko", label: "Korean", japanese: false };
+  }
+  if (/[\u4e00-\u9fff]/.test(text) && !/[\u3040-\u30ff]/.test(text)) {
+    return { code: "zh", label: "Chinese", japanese: false };
+  }
+  return { code: "und", label: "Latin / other", japanese: false };
+}
+
+export async function previewSyncedLyric(input: {
+  id?: number;
+  artistName?: string;
+  trackName?: string;
+}) {
+  const track = await getLrcLibTrack(input);
+  if (!track) {
+    throw new Error("Track not found on LRCLib");
+  }
+  const lines = linesFromTrack(track);
+  const sample = lines.map((line) => line.text).join("\n");
+  return {
+    id: track.id,
+    title: track.trackName,
+    artist: track.artistName,
+    album: track.albumName,
+    duration: track.duration,
+    instrumental: track.instrumental,
+    synced: Boolean(track.syncedLyrics),
+    language: detectLyricLanguage(sample),
+    lineCount: lines.length,
+    lines
+  };
+}
+
 type BlockInput = z.infer<typeof blockSchema>;
 
 export async function buildSyncedLyricBlocks(track: LrcLibTrack): Promise<BlockInput[]> {

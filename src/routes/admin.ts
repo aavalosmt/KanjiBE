@@ -4,7 +4,7 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { listGeminiModels, parseJapaneseToKanjiBE } from "../lib/gemini.js";
-import { importSyncedLyric } from "../lib/importSynced.js";
+import { importSyncedLyric, previewSyncedLyric } from "../lib/importSynced.js";
 import { searchLrcLib } from "../lib/lrclib.js";
 import { persistBlocks, toLyric, toStory } from "../lib/serialize.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
@@ -87,6 +87,20 @@ const lrclibImportSchema = z.object({
   artistName: z.string().trim().min(1).optional(),
   trackName: z.string().trim().min(1).optional(),
   youtubeUrl: z.string().trim().nullable().optional()
+});
+
+adminRouter.get("/lrclib/preview", async (req, res) => {
+  const id = Number(req.query.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "id is required" });
+    return;
+  }
+  try {
+    res.json(await previewSyncedLyric({ id }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Preview failed";
+    res.status(502).json({ error: message });
+  }
 });
 
 adminRouter.post("/lrclib/import", async (req, res) => {

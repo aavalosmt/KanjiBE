@@ -426,6 +426,21 @@ rt {
   border-top: 0;
 }
 
+.lyric-preview {
+  max-height: 22rem;
+  overflow: auto;
+  padding-left: 1.2rem;
+  font-family: var(--serif);
+  line-height: 1.7;
+}
+
+.lyric-preview span {
+  display: inline-block;
+  min-width: 4.2rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
 .import-result {
   margin-top: 1rem;
   padding: 0.85rem;

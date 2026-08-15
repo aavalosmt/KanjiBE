@@ -86,7 +86,8 @@ const lrclibImportSchema = z.object({
   id: z.number().int().positive().optional(),
   artistName: z.string().trim().min(1).optional(),
   trackName: z.string().trim().min(1).optional(),
-  youtubeUrl: z.string().trim().nullable().optional()
+  youtubeUrl: z.string().trim().nullable().optional(),
+  model: z.string().trim().min(1).optional()
 });
 
 adminRouter.get("/lrclib/preview", async (req, res) => {

@@ -105,15 +105,14 @@ REGLAS (CRÍTICO):
 9. No inventes ids, coverUrl, youtubeUrl ni imágenes. youtubeUrl solo si el texto trae un link de YouTube; si no, null.`;
 
 export const PREFERRED_GEMINI_MODELS = [
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-2.0-pro-exp-02-05",
+  "gemini-3.5-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-pro",
   "gemini-2.5-flash",
   "gemini-2.5-pro",
-  "gemini-1.5-pro",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-flash-8b",
-  "gemini-3.1-lite"
+  "gemini-3.1-lite",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro"
 ];
 
 function normalizeModelId(name: string): string {
@@ -157,8 +156,8 @@ export async function listGeminiModels(): Promise<{
     .filter((id) => !PREFERRED_GEMINI_MODELS.includes(id))
     .sort();
   const models = [...preferred, ...extras];
-  const fallback = models.includes("gemini-2.0-flash")
-    ? "gemini-2.0-flash"
+  const fallback = models.includes("gemini-3.5-flash")
+    ? "gemini-3.5-flash"
     : (models[0] ?? config.geminiModel);
   const selected = models.includes(config.geminiModel) ? config.geminiModel : fallback;
 

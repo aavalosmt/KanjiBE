@@ -232,6 +232,37 @@ function coverMarkup(url) {
   return `<img class="cover" src="${escapeHtml(url)}" alt="" />`;
 }
 
+function bindGeminiModelSelect() {
+  const modelSelect = document.querySelector("#tokenize-model");
+  if (!modelSelect) return;
+  const storedModel = localStorage.getItem("kanjibe.geminiModel");
+  void api("/api/admin/gemini/models")
+    .then((catalog) => {
+      const current = storedModel || catalog.default || "gemini-3.5-flash";
+      modelSelect.replaceChildren();
+      for (const id of catalog.models) {
+        const option = document.createElement("option");
+        option.value = id;
+        option.textContent = id;
+        if (id === current) option.selected = true;
+        modelSelect.append(option);
+      }
+      if (current && ![...modelSelect.options].some((item) => item.value === current)) {
+        const option = document.createElement("option");
+        option.value = current;
+        option.textContent = current;
+        option.selected = true;
+        modelSelect.prepend(option);
+      }
+    })
+    .catch(() => {
+      if (storedModel) modelSelect.value = storedModel;
+    });
+  modelSelect.addEventListener("change", () => {
+    localStorage.setItem("kanjibe.geminiModel", modelSelect.value);
+  });
+}
+
 function formatTime(seconds) {
   const total = Math.max(0, Number(seconds) || 0);
   const m = Math.floor(total / 60);
@@ -286,7 +317,11 @@ async function showLrcPreview(id, host) {
         const youtubeUrl = document.querySelector("#lrc-youtube")?.value.trim() || null;
         const created = await api("/api/admin/lrclib/import", {
           method: "POST",
-          body: JSON.stringify({ id: preview.id, youtubeUrl })
+          body: JSON.stringify({
+            id: preview.id,
+            youtubeUrl,
+            model: localStorage.getItem("kanjibe.geminiModel") || "gemini-3.5-flash"
+          })
         });
         if (created.usedGemini) {
           toast("Guardada con furigana y traducción", "ok");
@@ -916,9 +951,9 @@ function renderImport() {
           <label class="field">
             <span>Modelo Gemini</span>
             <select id="tokenize-model">
-              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-              <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-              <option value="gemini-2.0-pro-exp-02-05">gemini-2.0-pro-exp-02-05</option>
+              <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+              <option value="gemini-3.6-flash">gemini-3.6-flash</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
             </select>
           </label>
         </div>
@@ -954,30 +989,7 @@ function renderImport() {
   document.querySelectorAll(".import-panel").forEach((panel) => enablePlainPaste(panel));
 
   const textarea = document.querySelector("#import-json");
-  const modelSelect = document.querySelector("#tokenize-model");
-  const storedModel = localStorage.getItem("kanjibe.geminiModel");
-  void api("/api/admin/gemini/models")
-    .then((catalog) => {
-      const current = storedModel || catalog.default;
-      modelSelect.replaceChildren();
-      for (const id of catalog.models) {
-        const option = document.createElement("option");
-        option.value = id;
-        option.textContent = id;
-        if (id === current) option.selected = true;
-        modelSelect.append(option);
-      }
-      if (current && ![...modelSelect.options].some((item) => item.value === current)) {
-        const option = document.createElement("option");
-        option.value = current;
-        option.textContent = current;
-        option.selected = true;
-        modelSelect.prepend(option);
-      }
-    })
-    .catch(() => {
-      if (storedModel) modelSelect.value = storedModel;
-    });
+  bindGeminiModelSelect();
 
   document.querySelector("#run-tokenize").addEventListener("click", async () => {
     const text = document.querySelector("#raw-jp").value.trim();
@@ -990,7 +1002,8 @@ function renderImport() {
     button.textContent = "Tokenizando…";
     try {
       const kind = document.querySelector("#tokenize-kind").value;
-      const model = modelSelect.value;
+      const model =
+        document.querySelector("#tokenize-model")?.value || "gemini-3.5-flash";
       localStorage.setItem("kanjibe.geminiModel", model);
       const data = await api("/api/admin/tokenize", {
         method: "POST",
@@ -1071,10 +1084,18 @@ async function route() {
           <div>
             <div class="kicker">LRCLib</div>
             <h1>Buscar canción</h1>
-            <p class="muted">Revisa la letra y el idioma antes de guardar. Nada se escribe en la base hasta que confirmes.</p>
+            <p class="muted">Revisa la letra y el idioma antes de guardar. Gemini usa el modelo global del panel (3.5 Flash por defecto).</p>
           </div>
         </div>
         <section class="editor pad search-panel">
+          <label class="field">
+            <span>Modelo Gemini</span>
+            <select id="tokenize-model">
+              <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+              <option value="gemini-3.6-flash">gemini-3.6-flash</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+            </select>
+          </label>
           <label class="field">
             <span>Artista o título</span>
             <div class="cover-row">
@@ -1087,6 +1108,7 @@ async function route() {
       `
       );
       bindLogout();
+      bindGeminiModelSelect();
       bindLrcLibSearch();
       return;
     }

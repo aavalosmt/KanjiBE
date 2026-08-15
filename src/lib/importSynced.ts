@@ -48,7 +48,10 @@ export async function previewSyncedLyric(input: {
 
 type BlockInput = z.infer<typeof blockSchema>;
 
-export async function buildSyncedLyricBlocks(track: LrcLibTrack): Promise<{
+export async function buildSyncedLyricBlocks(
+  track: LrcLibTrack,
+  model?: string
+): Promise<{
   blocks: BlockInput[];
   usedGemini: boolean;
   geminiError?: string;
@@ -58,7 +61,7 @@ export async function buildSyncedLyricBlocks(track: LrcLibTrack): Promise<{
     throw new Error("This track has no lyrics");
   }
 
-  const enriched = await enrichLyricLines(lines.map((line) => line.text));
+  const enriched = await enrichLyricLines(lines.map((line) => line.text), model);
 
   return {
     usedGemini: enriched.usedGemini,
@@ -77,6 +80,7 @@ export async function importSyncedLyric(input: {
   artistName?: string;
   trackName?: string;
   youtubeUrl?: string | null;
+  model?: string;
 }) {
   const track = await getLrcLibTrack(input);
   if (!track) {
@@ -86,7 +90,7 @@ export async function importSyncedLyric(input: {
     throw new Error("Track is instrumental");
   }
 
-  const built = await buildSyncedLyricBlocks(track);
+  const built = await buildSyncedLyricBlocks(track, input.model);
   const blocks = await persistBlocks(built.blocks);
   return {
     title: track.trackName,

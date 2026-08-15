@@ -165,6 +165,114 @@ export async function listGeminiModels(): Promise<{
   return { models, default: selected };
 }
 
+const lyricLineSchema = {
+  type: Type.OBJECT,
+  properties: {
+    index: { type: Type.INTEGER, description: "1-based line number from the input" },
+    content: {
+      type: Type.STRING,
+      description: "Same Japanese line with KanjiBE furigana markdown"
+    },
+    translation: {
+      type: Type.STRING,
+      description: "Spanish translation of this exact line. Required, never empty."
+    }
+  },
+  required: ["index", "content", "translation"]
+};
+
+const lyricLinesResponseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    lines: { type: Type.ARRAY, items: lyricLineSchema }
+  },
+  required: ["lines"]
+};
+
+const LINE_ENRICH_INSTRUCTION = `${SYSTEM_INSTRUCTION}
+
+Además: cada objeto en lines es UNA línea de la letra.
+- index es el número de esa línea.
+- content es esa línea con furigana.
+- translation es la traducción al español de ESA línea. Obligatoria.
+- No omitas líneas. No fusiones dos líneas.`;
+
+export type EnrichedLyricLine = {
+  content: string;
+  translation?: string;
+};
+
+export async function enrichLyricLines(
+  lines: string[],
+  model = config.geminiModel
+): Promise<{ lines: EnrichedLyricLine[]; usedGemini: boolean; error?: string }> {
+  const fallback: EnrichedLyricLine[] = lines.map((text) => ({ content: text }));
+  if (!config.geminiApiKey) {
+    return { lines: fallback, usedGemini: false, error: "GEMINI_API_KEY is not configured" };
+  }
+  if (lines.length === 0) {
+    return { lines: [], usedGemini: false };
+  }
+
+  const selected = normalizeModelId(model) || config.geminiModel;
+  const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+  const batchSize = 12;
+  const enriched = [...fallback];
+  let used = false;
+  const errors: string[] = [];
+
+  for (let start = 0; start < lines.length; start += batchSize) {
+    const batch = lines.slice(start, start + batchSize);
+    const numbered = batch
+      .map((text, offset) => `${start + offset + 1}. ${text}`)
+      .join("\n");
+    try {
+      const response = await ai.models.generateContent({
+        model: selected,
+        contents: `Translate and add furigana to each numbered line. Return ${batch.length} items.\n\n${numbered}`,
+        config: {
+          systemInstruction: LINE_ENRICH_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: lyricLinesResponseSchema,
+          temperature: 0
+        }
+      });
+      const raw = response.text;
+      if (!raw) throw new Error("empty Gemini response");
+      const parsed = JSON.parse(raw) as {
+        lines?: Array<{ index?: number; content?: string; translation?: string }>;
+      };
+      for (const item of parsed.lines ?? []) {
+        const index =
+          typeof item.index === "number" && item.index >= 1
+            ? item.index - 1
+            : NaN;
+        if (!Number.isInteger(index) || index < 0 || index >= lines.length) continue;
+        const translation = item.translation ? stripLineBreaks(item.translation) : "";
+        const content = item.content ? stripLineBreaks(item.content) : lines[index];
+        if (content) enriched[index] = { content, translation: translation || undefined };
+        if (translation) used = true;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`Gemini line batch ${start} failed`, error);
+      errors.push(message);
+    }
+  }
+
+  const translated = enriched.filter((line) => line.translation).length;
+  return {
+    lines: enriched,
+    usedGemini: used,
+    error:
+      translated === 0
+        ? errors[0] ?? "Gemini returned no translations"
+        : translated < lines.length
+          ? `Gemini translated ${translated}/${lines.length} lines`
+          : undefined
+  };
+}
+
 export async function parseJapaneseToKanjiBE(
   rawText: string,
   kind: "story" | "lyric" | "auto" = "auto",

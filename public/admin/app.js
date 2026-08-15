@@ -288,7 +288,11 @@ async function showLrcPreview(id, host) {
           method: "POST",
           body: JSON.stringify({ id: preview.id, youtubeUrl })
         });
-        toast("Canción guardada", "ok");
+        if (created.usedGemini) {
+          toast("Guardada con furigana y traducción", "ok");
+        } else {
+          toast(created.geminiError || "Guardada sin Gemini (sin traducción)", "error");
+        }
         go(`/lyrics/${created.id}`);
       } catch (error) {
         toast(error.message, "error");

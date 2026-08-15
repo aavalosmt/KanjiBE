@@ -862,6 +862,11 @@ function bindEditor(kind, isNew, id) {
     tab.addEventListener("click", () => setView(tab.dataset.view));
   });
 
+  document.querySelector("#copy-furigana-rules")?.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(FURIGANA_RULES);
+    toast("Reglas de furigana copiadas", "ok");
+  });
+
   document.querySelectorAll("[data-add]").forEach((button) => {
     button.addEventListener("click", () => {
       blocksRoot.insertAdjacentHTML("beforeend", blockEditor(emptyBlock(button.dataset.add), 0, kind));
@@ -1002,6 +1007,25 @@ function reindex() {
   });
 }
 
+const FURIGANA_RULES = `Reglas de furigana para el campo "content":
+
+Sintaxis: [Texto](furigana:lectura.por.kanji)
+
+- Envuelve la palabra completa entre corchetes, nunca un kanji suelto.
+  Bien: [飛行機](furigana:ひ.こう.き)
+  Mal:  [飛](furigana:ひ)行機
+- La lectura va separada por puntos (.), una parte por cada kanji del
+  texto, en el mismo orden: [家族](furigana:か.ぞく) → 家=か, 族=ぞく
+- Okurigana (hiragana sin furigana) se marca como su propio tramo:
+  [食べる](furigana:た.べる) → 食=た, べる=texto plano
+- Si el número de partes no coincide con el número de kanji (jukujikun,
+  lecturas irregulares), usa una sola lectura para toda la palabra:
+  [今日](furigana:きょう)
+- Solo los kanji reciben furigana; kana y puntuación quedan fuera de
+  los corchetes.
+- Usa la lectura real de esa palabra en ese contexto (on'yomi/kun'yomi
+  según corresponda), no inventes lecturas.`;
+
 function renderEditor(kind, item) {
   const isStory = kind === "stories";
   const isNew = !item;
@@ -1103,6 +1127,7 @@ function renderEditor(kind, item) {
           <div id="full-json-wrap" class="hidden">
             <textarea id="full-json" class="blocks-json" spellcheck="false"></textarea>
             <p class="muted">Copia este JSON completo (título, metadatos y bloques), edítalo con otro agente y pégalo aquí. Cambia a "Formulario" para verlo aplicado, o guarda directamente desde esta vista.</p>
+            <button class="ghost" id="copy-furigana-rules" type="button">Copiar reglas de furigana</button>
           </div>
           <div class="actions">
             <button class="primary" type="submit">Guardar</button>

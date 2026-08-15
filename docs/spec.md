@@ -62,5 +62,5 @@ See `GET /api/lyrics/:id` and the seed data in `prisma/seed.ts`.
 
 Implemented in this repository:
 
-- Public: `GET /api/stories`, `GET /api/stories/:id`, `GET /api/lyrics`, `GET /api/lyrics/:id`
+- Public: `GET /api/stories`, `GET /api/stories/:id`, `GET /api/lyrics`, `GET /api/lyrics/:id`, `GET /api/lookup?q=`
 - Admin: `POST|PUT|DELETE /api/admin/stories`, `POST|PUT|DELETE /api/admin/lyrics`, `POST /api/admin/upload`

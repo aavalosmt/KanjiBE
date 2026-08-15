@@ -36,6 +36,7 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/lyrics?page=1&limit=20`
 - `GET /api/lyrics/:id`
 - `GET /health`
+- `GET /api/lookup?q=知らない` — lematiza con Kuromoji (知る). No traduce; el cliente busca esa forma en EDICT.
 
 Las listas no incluyen `blocks`. El detalle sí, con traducciones y en el orden guardado.
 

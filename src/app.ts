@@ -7,6 +7,7 @@ import helmet from "helmet";
 import { config } from "./config.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminRouter } from "./routes/admin.js";
+import { lookupRouter } from "./routes/lookup.js";
 import { lyricsRouter } from "./routes/lyrics.js";
 import { storiesRouter } from "./routes/stories.js";
 import { uploadRouter } from "./routes/upload.js";
@@ -40,6 +41,15 @@ export function createApp() {
     })
   );
   app.use(express.json({ limit: "2mb" }));
+  app.use((req, res, next) => {
+    const started = Date.now();
+    res.on("finish", () => {
+      console.log(
+        `${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - started}ms`
+      );
+    });
+    next();
+  });
   app.use("/uploads", express.static(path.resolve(config.uploadDir)));
   app.use("/admin", express.static(adminDir));
 
@@ -53,6 +63,7 @@ export function createApp() {
 
   app.use("/api/stories", storiesRouter);
   app.use("/api/lyrics", lyricsRouter);
+  app.use("/api/lookup", lookupRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/admin", uploadRouter);
 

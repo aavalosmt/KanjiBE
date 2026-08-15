@@ -3,6 +3,7 @@ import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { prisma } from "./db.js";
 import { databaseUrl } from "./dbUrl.js";
+import { getTokenizer } from "./lib/kuromoji.js";
 
 function applyMigrations() {
   console.log(`Applying migrations (${databaseUrl})`);
@@ -61,6 +62,9 @@ async function main() {
   const app = createApp();
   const server = app.listen(config.port, "0.0.0.0", () => {
     console.log(`KanjiBE listening on ${config.publicBaseUrl} (port ${config.port})`);
+    void getTokenizer()
+      .then(() => console.log("Kuromoji dictionary ready"))
+      .catch((error) => console.error("Kuromoji failed to load", error));
   });
 
   async function shutdown() {

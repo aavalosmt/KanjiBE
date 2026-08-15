@@ -4,6 +4,8 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { listGeminiModels, parseJapaneseToKanjiBE } from "../lib/gemini.js";
+import { importSyncedLyric } from "../lib/importSynced.js";
+import { searchLrcLib } from "../lib/lrclib.js";
 import { persistBlocks, toLyric, toStory } from "../lib/serialize.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
@@ -55,6 +57,58 @@ adminRouter.post("/tokenize", async (req, res) => {
     res.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Gemini request failed";
+    res.status(502).json({ error: message });
+  }
+});
+
+adminRouter.get("/lrclib/search", async (req, res) => {
+  const query = String(req.query.q ?? "").trim();
+  if (!query) {
+    res.status(400).json({ error: "q is required" });
+    return;
+  }
+  const tracks = await searchLrcLib(query);
+  res.json({
+    data: tracks.slice(0, 20).map((track) => ({
+      id: track.id,
+      title: track.trackName,
+      artist: track.artistName,
+      album: track.albumName,
+      duration: track.duration,
+      instrumental: track.instrumental,
+      synced: Boolean(track.syncedLyrics),
+      hasLyrics: Boolean(track.syncedLyrics || track.plainLyrics)
+    }))
+  });
+});
+
+const lrclibImportSchema = z.object({
+  id: z.number().int().positive().optional(),
+  artistName: z.string().trim().min(1).optional(),
+  trackName: z.string().trim().min(1).optional(),
+  youtubeUrl: z.string().trim().nullable().optional()
+});
+
+adminRouter.post("/lrclib/import", async (req, res) => {
+  const payload = lrclibImportSchema.parse(req.body);
+  if (!payload.id && !(payload.artistName && payload.trackName)) {
+    res.status(400).json({ error: "id or artistName+trackName is required" });
+    return;
+  }
+
+  try {
+    const built = await importSyncedLyric(payload);
+    const lyric = await prisma.lyric.create({
+      data: {
+        title: built.title,
+        artist: built.artist,
+        youtubeUrl: built.youtubeUrl,
+        blocks: built.blocks
+      }
+    });
+    res.status(201).json({ ...toLyric(lyric), source: built.source });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Import failed";
     res.status(502).json({ error: message });
   }
 });

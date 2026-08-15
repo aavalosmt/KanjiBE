@@ -231,6 +231,72 @@ function coverMarkup(url) {
   return `<img class="cover" src="${escapeHtml(url)}" alt="" />`;
 }
 
+function bindLrcLibSearch() {
+  const input = document.querySelector("#lrclib-q");
+  const results = document.querySelector("#lrclib-results");
+  if (!input || !results) return;
+
+  const run = async () => {
+    const q = input.value.trim();
+    if (!q) {
+      toast("Escribe artista o canción", "error");
+      return;
+    }
+    results.textContent = "Buscando…";
+    try {
+      const data = await api(`/api/admin/lrclib/search?q=${encodeURIComponent(q)}`);
+      if (!data.data.length) {
+        results.innerHTML = `<p class="muted">Sin resultados</p>`;
+        return;
+      }
+      results.innerHTML = data.data
+        .map(
+          (track) => `
+        <article class="search-hit">
+          <div>
+            <strong>${escapeHtml(track.title)}</strong>
+            <p class="muted">${escapeHtml(track.artist)}${track.album ? ` · ${escapeHtml(track.album)}` : ""}</p>
+            <p class="muted">${track.synced ? "synced" : track.hasLyrics ? "letra plana" : "sin letra"}</p>
+          </div>
+          <button class="primary" data-import="${track.id}" type="button" ${track.hasLyrics ? "" : "disabled"}>Importar</button>
+        </article>`
+        )
+        .join("");
+      results.querySelectorAll("[data-import]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          button.textContent = "Importando…";
+          try {
+            const created = await api("/api/admin/lrclib/import", {
+              method: "POST",
+              body: JSON.stringify({ id: Number(button.dataset.import) })
+            });
+            toast("Canción importada", "ok");
+            go(`/lyrics/${created.id}`);
+          } catch (error) {
+            toast(error.message, "error");
+            button.disabled = false;
+            button.textContent = "Importar";
+          }
+        });
+      });
+    } catch (error) {
+      results.textContent = "";
+      toast(error.message, "error");
+    }
+  };
+
+  document.querySelector("#lrclib-search")?.addEventListener("click", () => {
+    void run();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void run();
+    }
+  });
+}
+
 function renderList(kind, items) {
   const isStory = kind === "stories";
   const cards = items.length
@@ -266,10 +332,25 @@ function renderList(kind, items) {
           <a class="primary" href="#/${kind}/new">Nueva ${isStory ? "historia" : "letra"}</a>
         </div>
       </div>
+      ${
+        isStory
+          ? ""
+          : `<section class="editor pad search-panel">
+        <label class="field">
+          <span>Buscar en LRCLib</span>
+          <div class="cover-row">
+            <input id="lrclib-q" placeholder="Blue Bird Ikimonogakari" />
+            <button class="primary" id="lrclib-search" type="button">Buscar</button>
+          </div>
+        </label>
+        <div id="lrclib-results"></div>
+      </section>`
+      }
       <section class="grid">${cards}</section>
     `
   );
   bindLogout();
+  if (!isStory) bindLrcLibSearch();
 
   app.querySelectorAll("[data-del]").forEach((button) => {
     button.addEventListener("click", async () => {

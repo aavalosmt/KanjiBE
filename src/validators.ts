@@ -36,7 +36,8 @@ export const blockSchema = z
     translation: optionalText,
     url: z.string().trim().min(1).optional(),
     caption: optionalText,
-    tokens: z.array(blockTokenSchema).optional()
+    tokens: z.array(blockTokenSchema).optional(),
+    startTime: z.number().nonnegative().nullable().optional()
   })
   .superRefine((block, ctx) => {
     if ((block.type === "text" || block.type === "header") && !block.content) {
@@ -114,6 +115,7 @@ export function normalizeBlocks(
     if (block.url) normalized.url = block.url;
     if (block.caption) normalized.caption = block.caption;
     if (block.tokens?.length) normalized.tokens = block.tokens;
+    if (block.startTime != null) normalized.startTime = block.startTime;
 
     return normalized;
   });

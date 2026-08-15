@@ -20,6 +20,7 @@ export type ContentBlock = {
   url?: string;
   caption?: string;
   tokens?: BlockToken[];
+  startTime?: number | null;
 };
 
 export type StorySummary = {

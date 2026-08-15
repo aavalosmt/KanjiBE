@@ -4,15 +4,22 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { listGeminiModels, parseJapaneseToKanjiBE } from "../lib/gemini.js";
-import { importSyncedLyric, previewSyncedLyric } from "../lib/importSynced.js";
+import { importSyncedLyric, previewSyncedLyric, resyncLyricTimestamps } from "../lib/importSynced.js";
 import { searchLrcLib } from "../lib/lrclib.js";
-import { persistBlocks, toLyric, toStory } from "../lib/serialize.js";
+import {
+  deserializeBlocks,
+  persistBlocks,
+  preserveStartTimes,
+  toLyric,
+  toStory
+} from "../lib/serialize.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
   importSchema,
   lyricCreateSchema,
   lyricUpdateSchema,
   normalizeImportPayload,
+  parseBlocks,
   storyCreateSchema,
   storyUpdateSchema
 } from "../validators.js";
@@ -290,6 +297,12 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
   const payload = lyricUpdateSchema.parse(req.body);
 
   try {
+    const existing = await prisma.lyric.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: "Lyric not found" });
+      return;
+    }
+
     const lyric = await prisma.lyric.update({
       where: { id: req.params.id },
       data: {
@@ -298,7 +311,14 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
         translation: payload.translation,
         coverUrl: payload.coverUrl,
         youtubeUrl: payload.youtubeUrl,
-        blocks: payload.blocks ? await persistBlocks(payload.blocks) : undefined
+        blocks: payload.blocks
+          ? await persistBlocks(
+              preserveStartTimes(
+                payload.blocks,
+                parseBlocks(deserializeBlocks(existing.blocks))
+              )
+            )
+          : undefined
       }
     });
     res.json(toLyric(lyric));
@@ -308,6 +328,37 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
       return;
     }
     throw error;
+  }
+});
+
+const resyncSchema = z.object({
+  id: z.number().int().positive().optional()
+});
+
+adminRouter.post("/lyrics/:id/resync-timestamps", async (req, res) => {
+  const payload = resyncSchema.parse(req.body ?? {});
+
+  try {
+    const existing = await prisma.lyric.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: "Lyric not found" });
+      return;
+    }
+
+    const restored = await resyncLyricTimestamps({
+      title: existing.title,
+      artist: existing.artist,
+      blocks: existing.blocks,
+      lrclibId: payload.id
+    });
+    const lyric = await prisma.lyric.update({
+      where: { id: req.params.id },
+      data: { blocks: restored.blocks }
+    });
+    res.json({ ...toLyric(lyric), applied: restored.applied, source: restored.source });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Resync failed";
+    res.status(502).json({ error: message });
   }
 });
 

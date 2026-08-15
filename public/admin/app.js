@@ -469,12 +469,25 @@ function emptyBlock(type) {
   return { type, content: "", translation: "" };
 }
 
-function blockEditor(block, index) {
+function blockEditor(block, index, kind) {
   const wrapButton =
     block.type === "image"
       ? ""
       : `<button class="tiny" data-wrap="${index}" type="button">Furigana</button>`;
+  const hiddenId = block.id
+    ? `<input type="hidden" data-field="id" value="${escapeHtml(block.id)}" />`
+    : "";
+  const timeField =
+    kind === "lyrics" && block.type !== "image"
+      ? `<label class="field time-field">
+          <span>Tiempo (s)</span>
+          <input data-field="startTime" type="number" step="0.01" min="0" value="${
+            block.startTime == null ? "" : escapeHtml(block.startTime)
+          }" placeholder="0.00" />
+        </label>`
+      : "";
   const common = `
+    ${hiddenId}
     <div class="block-head">
       <b>${block.type}</b>
       <div class="block-tools">
@@ -484,6 +497,7 @@ function blockEditor(block, index) {
         <button class="tiny danger" data-remove="${index}" type="button">Quitar</button>
       </div>
     </div>
+    ${timeField}
   `;
 
   if (block.type === "image") {
@@ -530,8 +544,15 @@ function collectForm(form) {
     const type = node.querySelector("b").textContent.trim();
     const block = { type };
     node.querySelectorAll("[data-field]").forEach((input) => {
+      const key = input.dataset.field;
       const value = input.value.trim();
-      if (value) block[input.dataset.field] = value;
+      if (!value) return;
+      if (key === "startTime") {
+        const seconds = Number(value);
+        if (Number.isFinite(seconds) && seconds >= 0) block.startTime = seconds;
+        return;
+      }
+      block[key] = value;
     });
     return block;
   });
@@ -575,6 +596,12 @@ function renderPreview(kind, form) {
   }
 
   for (const block of blocks) {
+    if (block.startTime != null && block.startTime !== "") {
+      const stamp = document.createElement("div");
+      stamp.className = "muted preview-time";
+      stamp.textContent = formatTime(block.startTime);
+      pane.append(stamp);
+    }
     if (block.type === "header") {
       const h = document.createElement("h2");
       h.append(renderFurigana(block.content ?? ""));
@@ -691,10 +718,28 @@ function bindEditor(kind, isNew, id) {
 
   document.querySelectorAll("[data-add]").forEach((button) => {
     button.addEventListener("click", () => {
-      blocksRoot.insertAdjacentHTML("beforeend", blockEditor(emptyBlock(button.dataset.add), 0));
+      blocksRoot.insertAdjacentHTML("beforeend", blockEditor(emptyBlock(button.dataset.add), 0, kind));
       reindex();
       refreshPreview();
     });
+  });
+
+  document.querySelector("#resync-times")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = "Buscando LRCLib…";
+    try {
+      const restored = await api(`/api/admin/lyrics/${id}/resync-timestamps`, {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+      toast(`${restored.applied} timestamps restaurados`, "ok");
+      await route();
+    } catch (error) {
+      toast(error.message, "error");
+      button.disabled = false;
+      button.textContent = "Recuperar timestamps";
+    }
   });
 
   blocksRoot.addEventListener("click", async (event) => {
@@ -857,9 +902,14 @@ function renderEditor(kind, item) {
             <button class="ghost" data-add="header" type="button">+ Encabezado</button>
             <button class="ghost" data-add="image" type="button">+ Imagen</button>
           </div>
-          <div id="blocks">${blocks.map((block, index) => blockEditor(block, index)).join("")}</div>
+          <div id="blocks">${blocks.map((block, index) => blockEditor(block, index, kind)).join("")}</div>
           <div class="actions">
             <button class="primary" type="submit">Guardar</button>
+            ${
+              !isStory && !isNew
+                ? `<button class="ghost" id="resync-times" type="button">Recuperar timestamps</button>`
+                : ""
+            }
           </div>
         </section>
         <aside class="preview-card">

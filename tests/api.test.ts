@@ -233,6 +233,43 @@ describe("admin lyrics", () => {
     expect(updated.body.blocks).toHaveLength(1);
     expect(updated.body.blocks[0].id).toBeTruthy();
   });
+
+  it("keeps startTime when the editor omits it", async () => {
+    await request(app)
+      .post("/api/admin/lyrics")
+      .set(admin)
+      .send({
+        id: "song-times",
+        title: "Idol",
+        artist: "YOASOBI",
+        blocks: [
+          {
+            id: "line-1",
+            type: "text",
+            content: "[無敵](furigana:む.てき)の笑顔",
+            startTime: 0.96
+          }
+        ]
+      });
+
+    const updated = await request(app)
+      .put("/api/admin/lyrics/song-times")
+      .set(admin)
+      .send({
+        translation: "Idol - YOASOBI",
+        blocks: [
+          {
+            id: "line-1",
+            type: "text",
+            content: "[無敵](furigana:む.てき)の笑顔"
+          }
+        ]
+      });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.translation).toBe("Idol - YOASOBI");
+    expect(updated.body.blocks[0].startTime).toBe(0.96);
+  });
 });
 
 describe("admin tokenize", () => {

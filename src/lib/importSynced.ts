@@ -1,6 +1,13 @@
 import { enrichLyricLines } from "./gemini.js";
-import { getLrcLibTrack, linesFromTrack, type LrcLibTrack } from "./lrclib.js";
-import { persistBlocks } from "./serialize.js";
+import {
+  getLrcLibTrack,
+  linesFromTrack,
+  searchLrcLib,
+  type LrcLibTrack
+} from "./lrclib.js";
+import { deserializeBlocks, persistBlocks, serializeBlocks } from "./serialize.js";
+import { applyLineTimes } from "./timestamps.js";
+import { parseBlocks } from "../validators.js";
 import type { z } from "zod";
 import type { blockSchema } from "../validators.js";
 
@@ -103,6 +110,52 @@ export async function importSyncedLyric(input: {
       lrclibId: track.id,
       albumName: track.albumName,
       duration: track.duration,
+      synced: Boolean(track.syncedLyrics)
+    }
+  };
+}
+
+export async function findSyncedTrack(title: string, artist: string): Promise<LrcLibTrack | null> {
+  const hits = await searchLrcLib(`${title} ${artist}`.trim());
+  const synced = hits.filter((track) => Boolean(track.syncedLyrics));
+  const exact = synced.find((track) => track.trackName === title && track.artistName === artist);
+  if (exact) return exact;
+  const titled = synced.find(
+    (track) =>
+      track.trackName === title ||
+      track.trackName.includes(title) ||
+      title.includes(track.trackName)
+  );
+  return titled ?? synced[0] ?? null;
+}
+
+export async function resyncLyricTimestamps(input: {
+  title: string;
+  artist: string;
+  blocks: unknown;
+  lrclibId?: number;
+}) {
+  const track = input.lrclibId
+    ? await getLrcLibTrack({ id: input.lrclibId })
+    : await findSyncedTrack(input.title, input.artist);
+  if (!track) {
+    throw new Error("No synced LRCLib track found for this title/artist");
+  }
+  const lines = linesFromTrack(track);
+  if (!lines.some((line) => line.startTime > 0)) {
+    throw new Error("This LRCLib track has no timestamps");
+  }
+  const { blocks, applied } = applyLineTimes(parseBlocks(deserializeBlocks(input.blocks)), lines);
+  if (applied === 0) {
+    throw new Error("Could not match any lyric lines to LRCLib timestamps");
+  }
+  return {
+    blocks: serializeBlocks(blocks),
+    applied,
+    source: {
+      lrclibId: track.id,
+      title: track.trackName,
+      artist: track.artistName,
       synced: Boolean(track.syncedLyrics)
     }
   };

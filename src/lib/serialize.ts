@@ -1,7 +1,10 @@
 import type { ContentBlock, Lyric, LyricSummary, Story, StorySummary } from "../types.js";
 import { analyzeBlock } from "./kuromoji.js";
+import { preserveStartTimes } from "./timestamps.js";
 import { normalizeBlocks, parseBlocks, type blockSchema } from "../validators.js";
 import type { z } from "zod";
+
+export { preserveStartTimes };
 
 export async function persistBlocks(
   blocks: z.infer<typeof blockSchema>[]

@@ -325,6 +325,15 @@ textarea {
   flex-wrap: wrap;
 }
 
+.time-field {
+  max-width: 10rem;
+}
+
+.preview-time {
+  font-variant-numeric: tabular-nums;
+  margin: 0.7rem 0 0.15rem;
+}
+
 .add-row {
   display: flex;
   flex-wrap: wrap;

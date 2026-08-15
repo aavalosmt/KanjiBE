@@ -37,7 +37,11 @@ export const blockSchema = z
     url: z.string().trim().min(1).optional(),
     caption: optionalText,
     tokens: z.array(blockTokenSchema).optional(),
-    startTime: z.number().nonnegative().nullable().optional()
+    startTime: z.preprocess((value) => {
+      if (value === "" || value === undefined) return undefined;
+      if (value === null) return null;
+      return value;
+    }, z.coerce.number().nonnegative().nullable().optional())
   })
   .superRefine((block, ctx) => {
     if ((block.type === "text" || block.type === "header") && !block.content) {

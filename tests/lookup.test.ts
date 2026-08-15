@@ -10,6 +10,46 @@ describe("GET /api/lookup", () => {
     expect(res.status).toBe(400);
   });
 
+  it("accepts the word in the path", async () => {
+    const res = await request(app).get("/api/lookup/食べて");
+    expect(res.status).toBe(200);
+    expect(res.body.lemma).toBe("食べる");
+  }, 20_000);
+});
+
+describe("POST /api/analyze", () => {
+  it("tags a block and groups verb auxiliaries", async () => {
+    const res = await request(app)
+      .post("/api/analyze")
+      .send({ text: "美味しいご飯を食べました" });
+    expect(res.status).toBe(200);
+    const types = res.body.tokens.map((token: { colorType: string }) => token.colorType);
+    expect(types).toContain("adjective");
+    expect(types).toContain("noun");
+    expect(types).toContain("particle");
+    expect(types).toContain("verb");
+    const eaten = res.body.tokens.find((token: { surface: string }) =>
+      token.surface.includes("食べ")
+    );
+    expect(eaten.surface).toBe("食べました");
+    expect(eaten.lemma).toBe("食べる");
+    expect(eaten.colorType).toBe("verb");
+    expect(eaten.color).toBe("#10B981");
+  }, 20_000);
+
+  it("strips story furigana markup before analyzing", async () => {
+    const res = await request(app)
+      .post("/api/analyze")
+      .send({ content: "[家族](furigana:か.ぞく)で[正月](furigana:しょう.がつ)を[すごす](furigana:すごす)。" });
+    expect(res.status).toBe(200);
+    expect(res.body.text).toBe("家族で正月をすごす。");
+    expect(res.body.tokens.some((token: { surface: string }) => token.surface === "家族")).toBe(
+      true
+    );
+  }, 20_000);
+});
+
+describe("GET /api/lookup lemmatize", () => {
   it("lemmatizes conjugated verbs for EDICT lookup", async () => {
     const unknown = await request(app).get("/api/lookup").query({ q: "知らない" });
     expect(unknown.status).toBe(200);

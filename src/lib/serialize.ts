@@ -1,5 +1,40 @@
-import type { Lyric, LyricSummary, Story, StorySummary } from "../types.js";
-import { parseBlocks } from "../validators.js";
+import type { ContentBlock, Lyric, LyricSummary, Story, StorySummary } from "../types.js";
+import { analyzeBlock } from "./kuromoji.js";
+import { normalizeBlocks, parseBlocks, type blockSchema } from "../validators.js";
+import type { z } from "zod";
+
+export async function persistBlocks(
+  blocks: z.infer<typeof blockSchema>[]
+): Promise<string> {
+  return serializeBlocks(await enrichBlocksWithTokens(normalizeBlocks(blocks)));
+}
+
+export async function enrichBlocksWithTokens(blocks: ContentBlock[]): Promise<ContentBlock[]> {
+  return Promise.all(
+    blocks.map(async (block) => {
+      if ((block.type !== "text" && block.type !== "header") || !block.content) {
+        return block;
+      }
+      try {
+        const { tokens } = await analyzeBlock(block.content);
+        return {
+          ...block,
+          tokens: tokens.map((token) => ({
+            surface: token.surface,
+            lemma: token.lemma,
+            reading: token.reading,
+            pos: token.pos,
+            colorType: token.colorType,
+            color: token.color
+          }))
+        };
+      } catch (error) {
+        console.error("Failed to analyze block", error);
+        return block;
+      }
+    })
+  );
+}
 
 export function serializeBlocks(blocks: unknown): string {
   return JSON.stringify(blocks ?? []);

@@ -5,6 +5,18 @@ import type { ContentBlock } from "./types.js";
 const optionalText = z.string().trim().min(1).optional();
 const nullableText = z.string().trim().min(1).nullable().optional();
 
+export const blockTokenSchema = z.object({
+  surface: z.string(),
+  lemma: z.string(),
+  reading: z.string().nullable().optional(),
+  pos: z.string().optional(),
+  posEn: z.string().nullable().optional(),
+  colorType: z.string(),
+  color: z.string(),
+  inflectionEn: z.string().nullable().optional(),
+  grammarEn: z.string().nullable().optional()
+});
+
 export const blockSchema = z
   .object({
     id: z.string().trim().min(1).optional(),
@@ -12,7 +24,8 @@ export const blockSchema = z
     content: optionalText,
     translation: optionalText,
     url: z.string().trim().min(1).optional(),
-    caption: optionalText
+    caption: optionalText,
+    tokens: z.array(blockTokenSchema).optional()
   })
   .superRefine((block, ctx) => {
     if ((block.type === "text" || block.type === "header") && !block.content) {
@@ -87,6 +100,7 @@ export function normalizeBlocks(
     if (block.translation) normalized.translation = block.translation;
     if (block.url) normalized.url = block.url;
     if (block.caption) normalized.caption = block.caption;
+    if (block.tokens?.length) normalized.tokens = block.tokens;
 
     return normalized;
   });

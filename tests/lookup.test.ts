@@ -49,6 +49,31 @@ describe("POST /api/analyze", () => {
   }, 20_000);
 });
 
+describe("saved lyric tokens", () => {
+  it("stores analysis tokens on each text block", async () => {
+    const created = await request(app)
+      .post("/api/admin/lyrics")
+      .set({ "x-admin-key": "test-admin-key" })
+      .send({
+        title: "Test",
+        artist: "A",
+        blocks: [{ type: "text", content: "[掴め](furigana:つか.め)!" }]
+      });
+    expect(created.status).toBe(201);
+    const tokens = created.body.blocks[0].tokens as Array<{
+      surface: string;
+      lemma: string;
+      colorType: string;
+      color: string;
+    }>;
+    expect(tokens.length).toBeGreaterThan(0);
+    const verb = tokens.find((token) => token.colorType === "verb") ?? tokens[0];
+    expect(verb.surface).toMatch(/掴/);
+    expect(verb.lemma).toBeTruthy();
+    expect(verb.color).toMatch(/^#/);
+  }, 20_000);
+});
+
 describe("GET /api/lookup lemmatize", () => {
   it("lemmatizes conjugated verbs for EDICT lookup", async () => {
     const unknown = await request(app).get("/api/lookup").query({ q: "知らない" });

@@ -1,5 +1,17 @@
 export type BlockType = "text" | "image" | "header";
 
+export type BlockToken = {
+  surface: string;
+  lemma: string;
+  reading?: string | null;
+  pos?: string;
+  posEn?: string | null;
+  colorType: string;
+  color: string;
+  inflectionEn?: string | null;
+  grammarEn?: string | null;
+};
+
 export type ContentBlock = {
   id: string;
   type: BlockType;
@@ -7,6 +19,7 @@ export type ContentBlock = {
   translation?: string;
   url?: string;
   caption?: string;
+  tokens?: BlockToken[];
 };
 
 export type StorySummary = {

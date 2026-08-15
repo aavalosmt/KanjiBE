@@ -4,13 +4,12 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { listGeminiModels, parseJapaneseToKanjiBE } from "../lib/gemini.js";
-import { serializeBlocks, toLyric, toStory } from "../lib/serialize.js";
+import { persistBlocks, toLyric, toStory } from "../lib/serialize.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
   importSchema,
   lyricCreateSchema,
   lyricUpdateSchema,
-  normalizeBlocks,
   normalizeImportPayload,
   storyCreateSchema,
   storyUpdateSchema
@@ -73,7 +72,7 @@ adminRouter.post("/import", async (req, res) => {
         level: item.level,
         translation: item.translation ?? null,
         coverUrl: item.coverUrl ?? null,
-        blocks: serializeBlocks(normalizeBlocks(item.blocks))
+        blocks: await persistBlocks(item.blocks)
       };
       if (item.id) {
         const existing = await prisma.story.findUnique({ where: { id: item.id } });
@@ -102,7 +101,7 @@ adminRouter.post("/import", async (req, res) => {
         artist: item.artist,
         translation: item.translation ?? null,
         coverUrl: item.coverUrl ?? null,
-        blocks: serializeBlocks(normalizeBlocks(item.blocks))
+        blocks: await persistBlocks(item.blocks)
       };
       if (item.id) {
         const existing = await prisma.lyric.findUnique({ where: { id: item.id } });
@@ -142,7 +141,7 @@ adminRouter.post("/stories", async (req, res) => {
         level: payload.level,
         translation: payload.translation ?? null,
         coverUrl: payload.coverUrl ?? null,
-        blocks: serializeBlocks(normalizeBlocks(payload.blocks))
+        blocks: await persistBlocks(payload.blocks)
       }
     });
     res.status(201).json(toStory(story));
@@ -166,7 +165,7 @@ adminRouter.put("/stories/:id", async (req, res) => {
         level: payload.level,
         translation: payload.translation,
         coverUrl: payload.coverUrl,
-        blocks: payload.blocks ? serializeBlocks(normalizeBlocks(payload.blocks)) : undefined
+        blocks: payload.blocks ? await persistBlocks(payload.blocks) : undefined
       }
     });
     res.json(toStory(story));
@@ -203,7 +202,7 @@ adminRouter.post("/lyrics", async (req, res) => {
         artist: payload.artist,
         translation: payload.translation ?? null,
         coverUrl: payload.coverUrl ?? null,
-        blocks: serializeBlocks(normalizeBlocks(payload.blocks))
+        blocks: await persistBlocks(payload.blocks)
       }
     });
     res.status(201).json(toLyric(lyric));
@@ -227,7 +226,7 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
         artist: payload.artist,
         translation: payload.translation,
         coverUrl: payload.coverUrl,
-        blocks: payload.blocks ? serializeBlocks(normalizeBlocks(payload.blocks)) : undefined
+        blocks: payload.blocks ? await persistBlocks(payload.blocks) : undefined
       }
     });
     res.json(toLyric(lyric));

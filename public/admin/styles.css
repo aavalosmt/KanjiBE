@@ -430,6 +430,27 @@ rt {
   font-family: var(--mono);
 }
 
+.hidden {
+  display: none !important;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.view-tab.active {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #f7f1e6;
+}
+
+.blocks-json {
+  min-height: 20rem;
+  font-family: var(--mono);
+  width: 100%;
+}
+
 .search-panel {
   margin-bottom: 1.2rem;
 }

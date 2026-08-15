@@ -553,9 +553,8 @@ function shiftBlockTimes(root, delta) {
   return changed;
 }
 
-function collectForm(form) {
-  const data = Object.fromEntries(new FormData(form).entries());
-  const blocks = [...form.querySelectorAll(".block")].map((node) => {
+function blocksFromDom(root) {
+  return [...root.querySelectorAll(".block")].map((node) => {
     const type = node.querySelector("b").textContent.trim();
     const block = { type };
     node.querySelectorAll("[data-field]").forEach((input) => {
@@ -571,7 +570,45 @@ function collectForm(form) {
     });
     return block;
   });
+}
+
+function collectForm(form, { strict = false } = {}) {
+  const data = Object.fromEntries(new FormData(form).entries());
+  const blocksRoot = document.querySelector("#blocks");
+  const jsonField = document.querySelector("#blocks-json");
+  let blocks;
+  if (blocksRoot?.classList.contains("hidden") && jsonField) {
+    try {
+      blocks = parseBlocksJson(jsonField.value);
+    } catch (error) {
+      if (strict) throw error;
+      blocks = [];
+    }
+  } else {
+    blocks = blocksFromDom(form);
+  }
   return { data, blocks };
+}
+
+function parseBlocksJson(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new Error("JSON inválido: " + error.message);
+  }
+  if (!Array.isArray(parsed)) throw new Error("El JSON debe ser un array de bloques");
+  return parsed.map((block) => ({
+    type: block.type === "image" || block.type === "header" ? block.type : "text",
+    ...(block.id ? { id: block.id } : {}),
+    ...(block.content ? { content: block.content } : {}),
+    ...(block.translation ? { translation: block.translation } : {}),
+    ...(block.url ? { url: block.url } : {}),
+    ...(block.caption ? { caption: block.caption } : {}),
+    ...(block.startTime != null && Number.isFinite(Number(block.startTime))
+      ? { startTime: Number(block.startTime) }
+      : {})
+  }));
 }
 
 function renderPreview(kind, form) {
@@ -731,6 +768,40 @@ function bindEditor(kind, isNew, id) {
   enablePlainPaste(form);
   refreshPreview();
 
+  const blocksJsonWrap = document.querySelector("#blocks-json-wrap");
+  const blocksJsonField = document.querySelector("#blocks-json");
+  const addRow = document.querySelector("#add-row");
+
+  const setView = (view) => {
+    document.querySelectorAll(".view-tab").forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.view === view);
+    });
+    if (view === "json") {
+      blocksJsonField.value = JSON.stringify(blocksFromDom(form), null, 2);
+      blocksRoot.classList.add("hidden");
+      addRow.classList.add("hidden");
+      blocksJsonWrap.classList.remove("hidden");
+    } else {
+      let parsed;
+      try {
+        parsed = parseBlocksJson(blocksJsonField.value);
+      } catch (error) {
+        toast(error.message, "error");
+        return;
+      }
+      blocksRoot.innerHTML = parsed.map((block, index) => blockEditor(block, index, kind)).join("");
+      blocksJsonWrap.classList.add("hidden");
+      blocksRoot.classList.remove("hidden");
+      addRow.classList.remove("hidden");
+      reindex();
+      refreshPreview();
+    }
+  };
+
+  document.querySelectorAll(".view-tab").forEach((tab) => {
+    tab.addEventListener("click", () => setView(tab.dataset.view));
+  });
+
   document.querySelectorAll("[data-add]").forEach((button) => {
     button.addEventListener("click", () => {
       blocksRoot.insertAdjacentHTML("beforeend", blockEditor(emptyBlock(button.dataset.add), 0, kind));
@@ -823,7 +894,13 @@ function bindEditor(kind, isNew, id) {
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const { data, blocks } = collectForm(form);
+    let data, blocks;
+    try {
+      ({ data, blocks } = collectForm(form, { strict: true }));
+    } catch (error) {
+      toast(error.message, "error");
+      return;
+    }
     const payload = {
       title: data.title,
       translation: data.translation || null,
@@ -950,13 +1027,21 @@ function renderEditor(kind, item) {
           }
           <div class="row">
             <h2>Bloques</h2>
+            <div class="view-toggle" role="tablist">
+              <button class="tiny view-tab active" data-view="blocks" type="button">Bloques</button>
+              <button class="tiny view-tab" data-view="json" type="button">JSON</button>
+            </div>
           </div>
-          <div class="add-row">
+          <div id="add-row" class="add-row">
             <button class="ghost" data-add="text" type="button">+ Texto</button>
             <button class="ghost" data-add="header" type="button">+ Encabezado</button>
             <button class="ghost" data-add="image" type="button">+ Imagen</button>
           </div>
           <div id="blocks">${blocks.map((block, index) => blockEditor(block, index, kind)).join("")}</div>
+          <div id="blocks-json-wrap" class="hidden">
+            <textarea id="blocks-json" class="blocks-json" spellcheck="false"></textarea>
+            <p class="muted">Copia este JSON, edítalo con otro agente y pégalo aquí. Cambia a "Bloques" para verlo aplicado, o guarda directamente desde esta vista.</p>
+          </div>
           <div class="actions">
             <button class="primary" type="submit">Guardar</button>
             ${

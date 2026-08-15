@@ -538,6 +538,21 @@ function blockEditor(block, index, kind) {
   `;
 }
 
+function shiftBlockTimes(root, delta) {
+  const amount = Number(delta);
+  if (!Number.isFinite(amount) || amount === 0) return 0;
+  let changed = 0;
+  root.querySelectorAll('[data-field="startTime"]').forEach((field) => {
+    const current = field.value.trim();
+    if (!current) return;
+    const value = Number(current);
+    if (!Number.isFinite(value)) return;
+    field.value = String(Math.max(0, Number((value + amount).toFixed(3))));
+    changed += 1;
+  });
+  return changed;
+}
+
 function collectForm(form) {
   const data = Object.fromEntries(new FormData(form).entries());
   const blocks = [...form.querySelectorAll(".block")].map((node) => {
@@ -724,6 +739,30 @@ function bindEditor(kind, isNew, id) {
     });
   });
 
+  const applyTimeShift = (sign) => {
+    const input = document.querySelector("#time-shift");
+    const seconds = Number(input?.value);
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      toast("Indica los segundos a desplazar", "error");
+      return;
+    }
+    const changed = shiftBlockTimes(form, sign * seconds);
+    if (!changed) {
+      toast("No hay timestamps que desplazar", "error");
+      return;
+    }
+    refreshPreview();
+    const label = sign < 0 ? `−${seconds}` : `+${seconds}`;
+    toast(`${changed} tiempos ${label}s. Pulsa Guardar para conservar`, "ok");
+  };
+
+  document.querySelector("#time-shift-plus")?.addEventListener("click", () => {
+    applyTimeShift(1);
+  });
+  document.querySelector("#time-shift-minus")?.addEventListener("click", () => {
+    applyTimeShift(-1);
+  });
+
   document.querySelector("#resync-times")?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -893,6 +932,21 @@ function renderEditor(kind, item) {
             <span>YouTube</span>
             <input name="youtubeUrl" value="${escapeHtml(item?.youtubeUrl)}" placeholder="https://youtu.be/…" />
           </label>`
+          }
+          ${
+            isStory
+              ? ""
+              : `<div class="time-shift">
+            <label class="field">
+              <span>Desplazar todos los timestamps</span>
+              <div class="cover-row">
+                <input id="time-shift" type="number" min="0" step="0.01" value="0.5" />
+                <button class="ghost" id="time-shift-minus" type="button">− Restar</button>
+                <button class="ghost" id="time-shift-plus" type="button">+ Sumar</button>
+              </div>
+            </label>
+            <p class="muted">Suma o resta esos segundos a todas las líneas. Luego guarda.</p>
+          </div>`
           }
           <div class="row">
             <h2>Bloques</h2>

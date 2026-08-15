@@ -329,6 +329,18 @@ textarea {
   max-width: 10rem;
 }
 
+.time-shift {
+  margin: 0.4rem 0 0.8rem;
+}
+
+.time-shift .cover-row {
+  align-items: center;
+}
+
+.time-shift input {
+  max-width: 8rem;
+}
+
 .preview-time {
   font-variant-numeric: tabular-nums;
   margin: 0.7rem 0 0.15rem;

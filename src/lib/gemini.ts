@@ -68,7 +68,7 @@ const conversationBlockSchema = {
     url: { type: Type.STRING, description: "Image URL when type is image" },
     caption: { type: Type.STRING, description: "Image caption" }
   },
-  required: ["type"]
+  required: ["type", "content"]
 };
 
 const conversationSchema = {

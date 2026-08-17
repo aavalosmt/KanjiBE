@@ -1,8 +1,8 @@
-# Importar cuentos y canciones (JSON)
+# Importar cuentos, canciones y conversaciones (JSON)
 
 ## Tokenizar con Gemini
 
-En `/admin/#/import` pega japonés crudo y pulsa **Tokenizar con Gemini**. El backend llama a `gemini-2.5-flash` con structured output y rellena el JSON.
+En `/admin/#/import` pega japonés crudo, elige el tipo (**Cuento**, **Canción**, **Conversación** o **Auto**) y pulsa **Tokenizar con Gemini**. El backend llama a `gemini-2.5-flash` con structured output y rellena el JSON, incluyendo furigana y (para conversaciones) el `speaker` de cada línea.
 
 Variable: `GEMINI_API_KEY` (opcional `GEMINI_MODEL`). Sin key, el botón responde 503.
 
@@ -13,11 +13,12 @@ El panel admin acepta un JSON generado por otro agente. Pégalo en `/admin/#/imp
 ```json
 {
   "stories": [ /* cuentos */ ],
-  "lyrics": [ /* canciones */ ]
+  "lyrics": [ /* canciones */ ],
+  "conversations": [ /* conversaciones */ ]
 }
 ```
 
-También vale un solo objeto de cuento (`title` + `level`) o de canción (`title` + `artist`).
+También vale un solo objeto de cuento (`title` + `level`), de canción (`title` + `artist`) o de conversación (`title` + `topic`).
 
 Si mandas `id` y ya existe, se actualiza. Si no hay `id`, se crea uno nuevo.
 
@@ -33,14 +34,19 @@ Si mandas `id` y ya existe, se actualiza. Si no hay `id`, se crea uno nuevo.
 
 ## Lyric
 
-Igual, pero `artist` en vez de `level`. `youtubeUrl` es opcional (`https://youtu.be/…` o `youtube.com/watch?v=`).
+Igual, pero `artist` en vez de `level`. `youtubeUrl` es opcional (`https://youtu.be/…` o `youtube.com/watch?v=`). `level` también es opcional aquí.
+
+## Conversation
+
+Igual, pero `topic` (obligatorio, slug corto en snake_case, p. ej. `convenience_store`, `immigration_interview`) en vez de `level`. `level` es opcional, igual que en Lyric.
 
 ## Bloques
 
-`type` es `text`, `header` o `image`.
+`type` es `text`, `header`, `image` o `dialogue`.
 
 - `text` / `header`: `content` obligatorio. Furigana: `[家族](furigana:か.ぞく)`
 - `image`: `url` obligatorio; `caption` opcional
+- `dialogue` (solo tiene sentido en conversaciones): `content` y `speaker` obligatorios, p. ej. `speaker: "Empleado"`
 - `translation` opcional en todos
 
 ## Prompt para el otro agente
@@ -53,13 +59,16 @@ Genera JSON para KanjiBE. Responde SOLO con un objeto JSON válido, sin markdown
 Forma:
 {
   "stories": [{ "title", "level", "translation", "coverUrl", "blocks" }],
-  "lyrics": [{ "title", "artist", "translation", "coverUrl", "blocks" }]
+  "lyrics": [{ "title", "artist", "translation", "coverUrl", "blocks" }],
+  "conversations": [{ "title", "topic", "level", "translation", "coverUrl", "blocks" }]
 }
 
-blocks: array de { "type": "text"|"header"|"image", "content"?, "translation"?, "url"?, "caption"? }
-- text/header: content con furigana [漢字](furigana:かん.じ). Varios kanji: か.ぞく. Okurigana: た.べる
+blocks (stories/lyrics): array de { "type": "text"|"header"|"image", "content"?, "translation"?, "url"?, "caption"? }
+blocks (conversations): array de { "type": "dialogue"|"text"|"header"|"image", "speaker"? (obligatorio si type=dialogue), "content"?, "translation"?, "url"?, "caption"? }
+- text/header/dialogue: content con furigana [漢字](furigana:かん.じ). Varios kanji: か.ぞく. Okurigana: た.べる
 - image: url absoluta
 level: N5|N4|N3|N2|N1
+topic: slug corto en snake_case, ej. convenience_store, immigration_interview
 No inventes ids. coverUrl puede ser null.
 ```
 

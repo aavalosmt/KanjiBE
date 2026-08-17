@@ -174,11 +174,13 @@ export function normalizeBlocks(
 export const importSchema = z
   .object({
     stories: z.array(storyCreateSchema).default([]),
-    lyrics: z.array(lyricCreateSchema).default([])
+    lyrics: z.array(lyricCreateSchema).default([]),
+    conversations: z.array(conversationCreateSchema).default([])
   })
-  .refine((value) => value.stories.length + value.lyrics.length > 0, {
-    message: "Provide at least one story or lyric"
-  });
+  .refine(
+    (value) => value.stories.length + value.lyrics.length + value.conversations.length > 0,
+    { message: "Provide at least one story, lyric, or conversation" }
+  );
 
 export function normalizeImportPayload(body: unknown): unknown {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -186,16 +188,24 @@ export function normalizeImportPayload(body: unknown): unknown {
   }
 
   const record = body as Record<string, unknown>;
-  if (Array.isArray(record.stories) || Array.isArray(record.lyrics)) {
+  if (
+    Array.isArray(record.stories) ||
+    Array.isArray(record.lyrics) ||
+    Array.isArray(record.conversations)
+  ) {
     return body;
   }
 
   if (typeof record.title === "string" && typeof record.artist === "string") {
-    return { stories: [], lyrics: [record] };
+    return { stories: [], lyrics: [record], conversations: [] };
+  }
+
+  if (typeof record.title === "string" && typeof record.topic === "string") {
+    return { stories: [], lyrics: [], conversations: [record] };
   }
 
   if (typeof record.title === "string" && typeof record.level === "string") {
-    return { stories: [record], lyrics: [] };
+    return { stories: [record], lyrics: [], conversations: [] };
   }
 
   return body;

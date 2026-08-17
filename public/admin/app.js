@@ -1277,6 +1277,27 @@ const IMPORT_EXAMPLE = `{
         }
       ]
     }
+  ],
+  "conversations": [
+    {
+      "title": "コンビニで",
+      "topic": "convenience_store",
+      "translation": "En la tienda de conveniencia",
+      "blocks": [
+        {
+          "type": "dialogue",
+          "speaker": "Empleado",
+          "content": "[いらっしゃいませ](furigana:いらっしゃいませ)",
+          "translation": "¡Bienvenido!"
+        },
+        {
+          "type": "dialogue",
+          "speaker": "Cliente",
+          "content": "[袋](furigana:ふくろ)は[いりません](furigana:いりません)",
+          "translation": "No necesito bolsa"
+        }
+      ]
+    }
   ]
 }`;
 
@@ -1285,14 +1306,17 @@ const AGENT_PROMPT = `Genera JSON para KanjiBE. Responde SOLO con un objeto JSON
 Forma:
 {
   "stories": [{ "title", "level", "translation", "coverUrl", "blocks" }],
-  "lyrics": [{ "title", "artist", "translation", "coverUrl", "blocks" }]
+  "lyrics": [{ "title", "artist", "translation", "coverUrl", "blocks" }],
+  "conversations": [{ "title", "topic", "level", "translation", "coverUrl", "blocks" }]
 }
 
-blocks: array de { "type": "text"|"header"|"image", "content"?, "translation"?, "url"?, "caption"? }
+blocks (stories/lyrics): array de { "type": "text"|"header"|"image", "content"?, "translation"?, "url"?, "caption"? }
+blocks (conversations): array de { "type": "dialogue"|"text"|"header"|"image", "speaker"? (obligatorio si type=dialogue), "content"?, "translation"?, "url"?, "caption"? }
 - Palabra completa: [掴め](furigana:つか.め) [飛行機](furigana:ひ.こう.き) [知らない](furigana:し.ら.な.い)
 - NO kanji suelto: [掴](furigana:つか)め
 - image: url absoluta
-level: N5|N4|N3|N2|N1
+level: N5|N4|N3|N2|N1 (opcional en lyrics/conversations, obligatorio en stories)
+topic: slug corto en snake_case, ej. convenience_store, immigration_interview
 No inventes ids. coverUrl puede ser null.`;
 
 function renderImport() {
@@ -1309,7 +1333,7 @@ function renderImport() {
       <section class="editor pad import-panel">
         <div class="kicker">Gemini</div>
         <h2>Tokenizar texto crudo</h2>
-        <p class="muted">Pega el cuento o la letra en japonés. Gemini lo convierte al JSON de KanjiBE y lo deja abajo para que lo revises e importes.</p>
+        <p class="muted">Pega el cuento, la letra o el diálogo en japonés. Gemini lo convierte al JSON de KanjiBE y lo deja abajo para que lo revises e importes.</p>
         <div class="meta-grid">
           <label class="field">
             <span>Tipo</span>
@@ -1317,6 +1341,7 @@ function renderImport() {
               <option value="auto">Auto</option>
               <option value="story">Cuento</option>
               <option value="lyric">Canción</option>
+              <option value="conversation">Conversación</option>
             </select>
           </label>
           <label class="field">
@@ -1347,7 +1372,7 @@ function renderImport() {
         </div>
         <label class="field">
           <span>JSON</span>
-          <textarea id="import-json" class="import-json" spellcheck="false" placeholder='{ "stories": [], "lyrics": [] }'></textarea>
+          <textarea id="import-json" class="import-json" spellcheck="false" placeholder='{ "stories": [], "lyrics": [], "conversations": [] }'></textarea>
         </label>
         <div class="actions">
           <button class="primary" id="run-import" type="button">Importar</button>
@@ -1416,9 +1441,13 @@ function renderImport() {
         body: JSON.stringify(payload)
       });
       const created =
-        result.created.stories.length + result.created.lyrics.length;
+        result.created.stories.length +
+        result.created.lyrics.length +
+        (result.created.conversations?.length ?? 0);
       const updated =
-        result.updated.stories.length + result.updated.lyrics.length;
+        result.updated.stories.length +
+        result.updated.lyrics.length +
+        (result.updated.conversations?.length ?? 0);
       toast(`Creados ${created}, actualizados ${updated}`, result.errors.length ? "error" : "ok");
       resultEl.hidden = false;
       resultEl.textContent = JSON.stringify(result, null, 2);

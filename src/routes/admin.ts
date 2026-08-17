@@ -37,7 +37,7 @@ adminRouter.get("/session", (_req, res) => {
 
 const tokenizeSchema = z.object({
   text: z.string().trim().min(1),
-  kind: z.enum(["story", "lyric", "auto"]).default("auto"),
+  kind: z.enum(["story", "lyric", "conversation", "auto"]).default("auto"),
   model: z.string().trim().min(1).optional()
 });
 
@@ -140,9 +140,22 @@ adminRouter.post("/lrclib/import", async (req, res) => {
 
 adminRouter.post("/import", async (req, res) => {
   const payload = importSchema.parse(normalizeImportPayload(req.body));
-  const created = { stories: [] as ReturnType<typeof toStory>[], lyrics: [] as ReturnType<typeof toLyric>[] };
-  const updated = { stories: [] as ReturnType<typeof toStory>[], lyrics: [] as ReturnType<typeof toLyric>[] };
-  const errors: Array<{ type: "story" | "lyric"; index: number; id?: string; error: string }> = [];
+  const created = {
+    stories: [] as ReturnType<typeof toStory>[],
+    lyrics: [] as ReturnType<typeof toLyric>[],
+    conversations: [] as ReturnType<typeof toConversation>[]
+  };
+  const updated = {
+    stories: [] as ReturnType<typeof toStory>[],
+    lyrics: [] as ReturnType<typeof toLyric>[],
+    conversations: [] as ReturnType<typeof toConversation>[]
+  };
+  const errors: Array<{
+    type: "story" | "lyric" | "conversation";
+    index: number;
+    id?: string;
+    error: string;
+  }> = [];
 
   for (const [index, item] of payload.stories.entries()) {
     try {
@@ -204,7 +217,45 @@ adminRouter.post("/import", async (req, res) => {
     }
   }
 
-  res.status(errors.length && !created.stories.length && !created.lyrics.length && !updated.stories.length && !updated.lyrics.length ? 400 : 200).json({
+  for (const [index, item] of payload.conversations.entries()) {
+    try {
+      const data = {
+        title: item.title,
+        topic: item.topic,
+        level: item.level ?? null,
+        translation: item.translation ?? null,
+        coverUrl: item.coverUrl ?? null,
+        blocks: await persistBlocks(item.blocks)
+      };
+      if (item.id) {
+        const existing = await prisma.conversation.findUnique({ where: { id: item.id } });
+        if (existing) {
+          const conversation = await prisma.conversation.update({ where: { id: item.id }, data });
+          updated.conversations.push(toConversation(conversation));
+          continue;
+        }
+      }
+      const conversation = await prisma.conversation.create({ data: { id: item.id, ...data } });
+      created.conversations.push(toConversation(conversation));
+    } catch (error) {
+      errors.push({
+        type: "conversation",
+        index,
+        id: item.id,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  const nothingSaved =
+    !created.stories.length &&
+    !created.lyrics.length &&
+    !created.conversations.length &&
+    !updated.stories.length &&
+    !updated.lyrics.length &&
+    !updated.conversations.length;
+
+  res.status(errors.length && nothingSaved ? 400 : 200).json({
     created,
     updated,
     errors

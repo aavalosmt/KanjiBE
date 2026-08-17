@@ -38,5 +38,28 @@
         }
       ]
     }
+  ],
+  "conversations": [
+    {
+      "title": "コンビニで",
+      "topic": "convenience_store",
+      "level": "N4",
+      "translation": "En la tienda de conveniencia",
+      "coverUrl": null,
+      "blocks": [
+        {
+          "type": "dialogue",
+          "speaker": "Empleado",
+          "content": "[いらっしゃいませ](furigana:いらっしゃいませ)",
+          "translation": "¡Bienvenido!"
+        },
+        {
+          "type": "dialogue",
+          "speaker": "Cliente",
+          "content": "[袋](furigana:ふくろ)は[いりません](furigana:いりません)",
+          "translation": "No necesito bolsa"
+        }
+      ]
+    }
   ]
 }

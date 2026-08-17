@@ -50,13 +50,51 @@ const lyricSchema = {
   required: ["title", "artist", "blocks"]
 };
 
+const conversationBlockSchema = {
+  type: Type.OBJECT,
+  properties: {
+    type: { type: Type.STRING, enum: ["dialogue", "text", "header", "image"] },
+    speaker: {
+      type: Type.STRING,
+      description:
+        "Who says this line, e.g. \"Empleado\", \"Cliente\". Required when type is dialogue, omit otherwise."
+    },
+    content: {
+      type: Type.STRING,
+      description:
+        "One line of dialogue (or narration/header). Each [...](furigana:) span is a FULL word including okurigana: [掴め](furigana:つか.め) [飛行機](furigana:ひ.こう.き) [知らない](furigana:し.ら.な.い). Never isolate a kanji from its conjugation."
+    },
+    translation: { type: Type.STRING, description: "Spanish translation of this block" },
+    url: { type: Type.STRING, description: "Image URL when type is image" },
+    caption: { type: Type.STRING, description: "Image caption" }
+  },
+  required: ["type"]
+};
+
+const conversationSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    topic: {
+      type: Type.STRING,
+      description: "Short snake_case scenario slug, e.g. convenience_store, immigration_interview"
+    },
+    level: { type: Type.STRING, enum: ["N5", "N4", "N3", "N2", "N1"], nullable: true },
+    translation: { type: Type.STRING },
+    coverUrl: { type: Type.STRING, nullable: true },
+    blocks: { type: Type.ARRAY, items: conversationBlockSchema }
+  },
+  required: ["title", "topic", "blocks"]
+};
+
 const responseSchema = {
   type: Type.OBJECT,
   properties: {
     stories: { type: Type.ARRAY, items: storySchema },
-    lyrics: { type: Type.ARRAY, items: lyricSchema }
+    lyrics: { type: Type.ARRAY, items: lyricSchema },
+    conversations: { type: Type.ARRAY, items: conversationSchema }
   },
-  required: ["stories", "lyrics"]
+  required: ["stories", "lyrics", "conversations"]
 };
 
 const SYSTEM_INSTRUCTION = `Eres el motor de tokenización lingüística para KanjiBE.
@@ -101,8 +139,9 @@ REGLAS (CRÍTICO):
 6. CERO saltos de línea, \\n o <br> en content/title/translation/caption. Varias líneas del original = varios bloques.
 
 7. Traducción al español de la línea (no de cada kanji).
-8. kind=story → solo stories. kind=lyric → solo lyrics. auto → decide.
-9. No inventes ids, coverUrl, youtubeUrl ni imágenes. youtubeUrl solo si el texto trae un link de YouTube; si no, null.`;
+8. kind=story → solo stories. kind=lyric → solo lyrics. kind=conversation → solo conversations. auto → decide.
+9. No inventes ids, coverUrl, youtubeUrl ni imágenes. youtubeUrl solo si el texto trae un link de YouTube; si no, null.
+10. kind=conversation: cada línea de diálogo es un bloque type=dialogue con "speaker" (quién habla, ej. "Empleado", "Cliente") y "content" con esa línea en japonés con furigana. topic es un slug corto en snake_case que describe el escenario (ej. convenience_store, immigration_interview). Usa type=text/header solo para narración o acotaciones de escena, nunca para diálogo.`;
 
 export const PREFERRED_GEMINI_MODELS = [
   "gemini-3.5-flash",
@@ -274,7 +313,7 @@ export async function enrichLyricLines(
 
 export async function parseJapaneseToKanjiBE(
   rawText: string,
-  kind: "story" | "lyric" | "auto" = "auto",
+  kind: "story" | "lyric" | "conversation" | "auto" = "auto",
   model = config.geminiModel
 ) {
   if (!config.geminiApiKey) {
@@ -323,7 +362,8 @@ function cleanBlocks(blocks: ImportPayload["stories"][number]["blocks"]) {
     ...block,
     content: block.content ? stripLineBreaks(block.content) : block.content,
     translation: block.translation ? stripLineBreaks(block.translation) : block.translation,
-    caption: block.caption ? stripLineBreaks(block.caption) : block.caption
+    caption: block.caption ? stripLineBreaks(block.caption) : block.caption,
+    speaker: block.speaker ? stripLineBreaks(block.speaker) : block.speaker
   }));
 }
 
@@ -339,6 +379,13 @@ function stripImportedNewlines(payload: ImportPayload): ImportPayload {
       ...item,
       title: stripLineBreaks(item.title),
       artist: stripLineBreaks(item.artist),
+      translation: item.translation ? stripLineBreaks(item.translation) : item.translation,
+      blocks: cleanBlocks(item.blocks)
+    })),
+    conversations: payload.conversations.map((item) => ({
+      ...item,
+      title: stripLineBreaks(item.title),
+      topic: stripLineBreaks(item.topic),
       translation: item.translation ? stripLineBreaks(item.translation) : item.translation,
       blocks: cleanBlocks(item.blocks)
     }))

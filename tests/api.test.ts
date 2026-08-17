@@ -411,6 +411,15 @@ describe("admin tokenize", () => {
     expect(res.status).toBe(400);
   });
 
+  it("accepts kind=conversation", async () => {
+    const res = await request(app)
+      .post("/api/admin/tokenize")
+      .set(admin)
+      .send({ text: "いらっしゃいませ", kind: "conversation" });
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/GEMINI_API_KEY/);
+  });
+
   it("lists preferred models only when Gemini is not configured", async () => {
     const res = await request(app).get("/api/admin/gemini/models").set(admin);
     expect(res.status).toBe(503);
@@ -418,22 +427,39 @@ describe("admin tokenize", () => {
 });
 
 describe("admin import", () => {
-  it("imports stories and lyrics from a batch json", async () => {
+  it("imports stories, lyrics, and conversations from a batch json", async () => {
     const res = await request(app)
       .post("/api/admin/import")
       .set(admin)
       .send({
         stories: [{ title: "川", level: "N5", blocks: [{ type: "text", content: "[川](furigana:かわ)" }] }],
-        lyrics: [{ title: "Umi", artist: "Test", blocks: [{ type: "header", content: "A" }] }]
+        lyrics: [{ title: "Umi", artist: "Test", blocks: [{ type: "header", content: "A" }] }],
+        conversations: [
+          {
+            title: "コンビニで",
+            topic: "convenience_store",
+            blocks: [{ type: "dialogue", speaker: "Clerk", content: "[いらっしゃいませ](furigana:いらっしゃいませ)" }]
+          }
+        ]
       });
 
     expect(res.status).toBe(200);
     expect(res.body.created.stories).toHaveLength(1);
     expect(res.body.created.lyrics).toHaveLength(1);
+    expect(res.body.created.conversations).toHaveLength(1);
     expect(res.body.created.stories[0].title).toBe("川");
+    expect(res.body.created.conversations[0]).toMatchObject({
+      title: "コンビニで",
+      topic: "convenience_store"
+    });
 
     const stories = await request(app).get("/api/stories");
     expect(stories.body.data.some((item: { title: string }) => item.title === "川")).toBe(true);
+
+    const conversations = await request(app).get("/api/conversations");
+    expect(
+      conversations.body.data.some((item: { title: string }) => item.title === "コンビニで")
+    ).toBe(true);
   });
 
   it("wraps a single story object and updates when id exists", async () => {
@@ -450,6 +476,24 @@ describe("admin import", () => {
       .send({ id: "import-1", title: "新", level: "N3" });
     expect(updated.body.updated.stories[0].title).toBe("新");
     expect(updated.body.created.stories).toHaveLength(0);
+  });
+
+  it("wraps a single conversation object by its topic field", async () => {
+    const res = await request(app)
+      .post("/api/admin/import")
+      .set(admin)
+      .send({
+        id: "import-conv-1",
+        title: "駅で",
+        topic: "train_station",
+        blocks: [{ type: "dialogue", speaker: "Staff", content: "[切符](furigana:きっぷ)はありますか" }]
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.created.conversations[0]).toMatchObject({
+      id: "import-conv-1",
+      title: "駅で",
+      topic: "train_station"
+    });
   });
 });
 

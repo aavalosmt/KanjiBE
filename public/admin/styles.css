@@ -207,11 +207,32 @@ h1 {
 .login,
 .editor,
 .block,
-.preview-card {
+.preview-card,
+.modal {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 1.1rem;
   box-shadow: var(--shadow);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(29, 24, 18, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 60;
+}
+
+.modal {
+  width: min(24rem, 100%);
+  padding: 1.25rem 1.4rem 1.4rem;
+}
+
+.modal h2 {
+  margin-bottom: 0.3rem;
 }
 
 .empty,

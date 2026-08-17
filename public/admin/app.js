@@ -43,6 +43,90 @@ function slugify(value) {
     .replace(/^_+|_+$/g, "");
 }
 
+function openTopicModal() {
+  return new Promise((resolve) => {
+    const host = document.createElement("div");
+    host.className = "modal-backdrop";
+    host.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="topic-modal-title">
+        <h2 id="topic-modal-title">Nuevo tema</h2>
+        <p class="muted">Aparecer\u00e1 en el selector de tema y en el filtro de la lista.</p>
+        <label class="field">
+          <span>Nombre</span>
+          <input id="topic-modal-label" placeholder="Aeropuerto" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Slug</span>
+          <input id="topic-modal-slug" placeholder="airport" autocomplete="off" />
+        </label>
+        <div class="actions">
+          <button class="primary" id="topic-modal-create" type="button">Crear</button>
+          <button class="ghost" id="topic-modal-cancel" type="button">Cancelar</button>
+        </div>
+      </div>
+    `;
+    document.body.append(host);
+
+    const labelInput = host.querySelector("#topic-modal-label");
+    const slugInput = host.querySelector("#topic-modal-slug");
+    const createButton = host.querySelector("#topic-modal-create");
+    labelInput.focus();
+
+    let slugTouched = false;
+    slugInput.addEventListener("input", () => {
+      slugTouched = true;
+    });
+    labelInput.addEventListener("input", () => {
+      if (!slugTouched) slugInput.value = slugify(labelInput.value);
+    });
+
+    function onKeydown(event) {
+      if (event.key === "Escape") close(null);
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void create();
+      }
+    }
+
+    function close(result) {
+      document.removeEventListener("keydown", onKeydown);
+      host.remove();
+      resolve(result);
+    }
+
+    async function create() {
+      const label = labelInput.value.trim();
+      const slug = slugInput.value.trim();
+      if (!label || !slug) {
+        toast("Nombre y slug son obligatorios", "error");
+        return;
+      }
+      createButton.disabled = true;
+      createButton.textContent = "Creando\u2026";
+      try {
+        const topic = await api("/api/admin/topics", {
+          method: "POST",
+          body: JSON.stringify({ slug, label })
+        });
+        close(topic);
+      } catch (error) {
+        toast(error.message, "error");
+        createButton.disabled = false;
+        createButton.textContent = "Crear";
+      }
+    }
+
+    host.addEventListener("click", (event) => {
+      if (event.target === host) close(null);
+    });
+    document.addEventListener("keydown", onKeydown);
+    host.querySelector("#topic-modal-cancel").addEventListener("click", () => close(null));
+    createButton.addEventListener("click", () => {
+      void create();
+    });
+  });
+}
+
 function isKanji(char) {
   const code = char.codePointAt(0) ?? 0;
   return code >= 0x4e00 && code <= 0x9faf;
@@ -1073,26 +1157,16 @@ function bindEditor(kind, isNew, id) {
   });
 
   document.querySelector("#add-topic")?.addEventListener("click", async () => {
-    const label = prompt("Nombre del nuevo tema (ej. Aeropuerto)");
-    if (!label) return;
-    const slug = prompt("Slug (snake_case, ej. airport)", slugify(label));
-    if (!slug) return;
-    try {
-      const topic = await api("/api/admin/topics", {
-        method: "POST",
-        body: JSON.stringify({ slug, label })
-      });
-      const select = form.elements.topic;
-      select.querySelectorAll('option[value=""]').forEach((opt) => opt.remove());
-      const option = document.createElement("option");
-      option.value = topic.slug;
-      option.textContent = topic.label;
-      option.selected = true;
-      select.append(option);
-      toast("Tema creado", "ok");
-    } catch (error) {
-      toast(error.message, "error");
-    }
+    const topic = await openTopicModal();
+    if (!topic) return;
+    const select = form.elements.topic;
+    select.querySelectorAll('option[value=""]').forEach((opt) => opt.remove());
+    const option = document.createElement("option");
+    option.value = topic.slug;
+    option.textContent = topic.label;
+    option.selected = true;
+    select.append(option);
+    toast("Tema creado", "ok");
   });
 
   form.addEventListener("submit", async (event) => {

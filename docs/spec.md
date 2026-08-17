@@ -47,7 +47,8 @@ The API stores this syntax as-is. Alignment is a client concern.
   "translation": "String (Optional - Spanish/English translation of the block)",
   "url": "String (Only if type == image)",
   "caption": "String (Optional)",
-  "speaker": "String (Required if type == dialogue, e.g. \"Clerk\", \"You\")"
+  "speaker": "String (Required if type == dialogue, e.g. \"Clerk\", \"You\")",
+  "notes": "String (Optional - grammar/cultural note for the block)"
 }
 ```
 

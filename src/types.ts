@@ -20,6 +20,7 @@ export type ContentBlock = {
   url?: string;
   caption?: string;
   speaker?: string;
+  notes?: string;
   tokens?: BlockToken[];
   startTime?: number | null;
 };

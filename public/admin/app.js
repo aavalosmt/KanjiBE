@@ -3,15 +3,15 @@ const app = document.querySelector("#app");
 const toastEl = document.querySelector("#toast");
 
 function getKey() {
-  return sessionStorage.getItem(KEY) ?? "";
+  return localStorage.getItem(KEY) ?? "";
 }
 
 function setKey(value) {
-  sessionStorage.setItem(KEY, value);
+  localStorage.setItem(KEY, value);
 }
 
 function clearKey() {
-  sessionStorage.removeItem(KEY);
+  localStorage.removeItem(KEY);
 }
 
 function toast(message, kind = "") {
@@ -512,6 +512,14 @@ function blockEditor(block, index, kind) {
     ${timeField}
   `;
 
+  const notesField =
+    kind === "conversations"
+      ? `<label class="field">
+          <span>Notas</span>
+          <input data-field="notes" value="${escapeHtml(block.notes)}" placeholder="Nota cultural o gramatical" />
+        </label>`
+      : "";
+
   if (block.type === "image") {
     return `
       <article class="block" data-index="${index}">
@@ -531,6 +539,7 @@ function blockEditor(block, index, kind) {
           <span>Traducción</span>
           <input data-field="translation" value="${escapeHtml(block.translation)}" />
         </label>
+        ${notesField}
       </article>
     `;
   }
@@ -555,6 +564,7 @@ function blockEditor(block, index, kind) {
         <span>Traducción</span>
         <input data-field="translation" value="${escapeHtml(block.translation)}" />
       </label>
+      ${notesField}
     </article>
   `;
 }
@@ -600,7 +610,8 @@ function blockForJsonView(block, kind) {
       type: "image",
       url: block.url || "",
       caption: block.caption ?? null,
-      translation: block.translation ?? null
+      translation: block.translation ?? null,
+      ...(kind === "conversations" ? { notes: block.notes ?? null } : {})
     };
   }
   const view = {
@@ -611,6 +622,7 @@ function blockForJsonView(block, kind) {
   };
   if (kind === "lyrics") view.startTime = block.startTime ?? null;
   if (block.type === "dialogue") view.speaker = block.speaker || "";
+  if (kind === "conversations") view.notes = block.notes ?? null;
   return view;
 }
 
@@ -649,6 +661,7 @@ function normalizeBlocksArray(parsed) {
     ...(block.url ? { url: block.url } : {}),
     ...(block.caption ? { caption: block.caption } : {}),
     ...(block.speaker ? { speaker: block.speaker } : {}),
+    ...(block.notes ? { notes: block.notes } : {}),
     ...(block.startTime != null && Number.isFinite(Number(block.startTime))
       ? { startTime: Number(block.startTime) }
       : {})
@@ -749,6 +762,12 @@ function renderPreview(kind, form) {
       tr.className = "preview-tr";
       tr.textContent = block.translation;
       pane.append(tr);
+    }
+    if (block.notes) {
+      const note = document.createElement("p");
+      note.className = "preview-note";
+      note.textContent = block.notes;
+      pane.append(note);
     }
   }
 }

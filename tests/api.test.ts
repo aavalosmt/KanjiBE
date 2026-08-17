@@ -66,7 +66,8 @@ const conversationPayload = {
       type: "dialogue",
       speaker: "Clerk",
       content: "[いらっしゃいませ](furigana:いらっしゃいませ)",
-      translation: "Welcome!"
+      translation: "Welcome!",
+      notes: "Set phrase said by any shop clerk when a customer enters."
     },
     {
       id: "b2",
@@ -356,7 +357,8 @@ describe("admin conversations", () => {
     expect(created.status).toBe(201);
     expect(created.body.blocks[0]).toMatchObject({
       type: "dialogue",
-      speaker: "Clerk"
+      speaker: "Clerk",
+      notes: "Set phrase said by any shop clerk when a customer enters."
     });
 
     const updated = await request(app)

@@ -37,6 +37,7 @@ export const blockSchema = z
     url: z.string().trim().min(1).optional(),
     caption: optionalText,
     speaker: optionalText,
+    notes: optionalText,
     tokens: z.array(blockTokenSchema).optional(),
     startTime: z.preprocess((value) => {
       if (value === "" || value === undefined) return undefined;
@@ -162,6 +163,7 @@ export function normalizeBlocks(
     if (block.url) normalized.url = block.url;
     if (block.caption) normalized.caption = block.caption;
     if (block.speaker) normalized.speaker = block.speaker;
+    if (block.notes) normalized.notes = block.notes;
     if (block.tokens?.length) normalized.tokens = block.tokens;
     if (block.startTime != null) normalized.startTime = block.startTime;
 

@@ -181,6 +181,7 @@ function layout(active, body) {
       <nav class="nav">
         <a href="#/stories" class="${active === "stories" ? "active" : ""}">Historias</a>
         <a href="#/lyrics" class="${active === "lyrics" ? "active" : ""}">Letras</a>
+        <a href="#/conversations" class="${active === "conversations" ? "active" : ""}">Conversaciones</a>
         <a href="#/search" class="${active === "search" ? "active" : ""}">Buscar</a>
         <a href="#/import" class="${active === "import" ? "active" : ""}">Importar</a>
         <button class="ghost" id="logout" type="button">Salir</button>
@@ -395,8 +396,18 @@ function bindLrcLibSearch() {
   });
 }
 
+function kindMeta(kind) {
+  if (kind === "stories") {
+    return { kicker: (item) => item.level, plural: "Historias", singular: "historia", lrclib: false };
+  }
+  if (kind === "lyrics") {
+    return { kicker: (item) => item.artist, plural: "Letras", singular: "letra", lrclib: true };
+  }
+  return { kicker: (item) => item.topic, plural: "Conversaciones", singular: "conversación", lrclib: false };
+}
+
 function renderList(kind, items) {
-  const isStory = kind === "stories";
+  const meta = kindMeta(kind);
   const cards = items.length
     ? items
         .map(
@@ -404,7 +415,7 @@ function renderList(kind, items) {
         <article class="card item">
           ${coverMarkup(item.coverUrl)}
           <div class="item-body">
-            <div class="kicker">${escapeHtml(isStory ? item.level : item.artist)}</div>
+            <div class="kicker">${escapeHtml(meta.kicker(item))}</div>
             <h2>${escapeHtml(item.title)}</h2>
             <p class="muted">${escapeHtml(item.translation ?? "")}</p>
             <div class="actions">
@@ -415,7 +426,7 @@ function renderList(kind, items) {
         </article>`
         )
         .join("")
-    : `<div class="empty"><h2>No hay ${isStory ? "historias" : "letras"} todavía</h2><p class="muted">Crea la primera desde este panel.</p></div>`;
+    : `<div class="empty"><h2>No hay ${meta.plural.toLowerCase()} todavía</h2><p class="muted">Crea la primera desde este panel.</p></div>`;
 
   app.innerHTML = layout(
     kind,
@@ -423,17 +434,16 @@ function renderList(kind, items) {
       <div class="row">
         <div>
           <div class="kicker">Contenido</div>
-          <h1>${isStory ? "Historias" : "Letras"}</h1>
+          <h1>${meta.plural}</h1>
         </div>
         <div class="actions">
           <a class="ghost" href="#/import">Importar JSON</a>
-          <a class="primary" href="#/${kind}/new">Nueva ${isStory ? "historia" : "letra"}</a>
+          <a class="primary" href="#/${kind}/new">Nueva ${meta.singular}</a>
         </div>
       </div>
       ${
-        isStory
-          ? ""
-          : `<section class="editor pad search-panel">
+        meta.lrclib
+          ? `<section class="editor pad search-panel">
         <label class="field">
           <span>Buscar en LRCLib</span>
           <div class="cover-row">
@@ -443,12 +453,13 @@ function renderList(kind, items) {
         </label>
         <div id="lrclib-results"></div>
       </section>`
+          : ""
       }
       <section class="grid">${cards}</section>
     `
   );
   bindLogout();
-  if (!isStory) bindLrcLibSearch();
+  if (meta.lrclib) bindLrcLibSearch();
 
   app.querySelectorAll("[data-del]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -466,6 +477,7 @@ function renderList(kind, items) {
 
 function emptyBlock(type) {
   if (type === "image") return { type, url: "", caption: "", translation: "" };
+  if (type === "dialogue") return { type, speaker: "", content: "", translation: "" };
   return { type, content: "", translation: "" };
 }
 
@@ -523,9 +535,18 @@ function blockEditor(block, index, kind) {
     `;
   }
 
+  const speakerField =
+    block.type === "dialogue"
+      ? `<label class="field">
+          <span>Hablante</span>
+          <input data-field="speaker" value="${escapeHtml(block.speaker)}" placeholder="Dependiente" />
+        </label>`
+      : "";
+
   return `
     <article class="block" data-index="${index}">
       ${common}
+      ${speakerField}
       <label class="field">
         <span>Contenido</span>
         <textarea data-field="content" class="jp" lang="ja" spellcheck="false" autocomplete="off">${escapeHtml(block.content)}</textarea>
@@ -589,6 +610,7 @@ function blockForJsonView(block, kind) {
     translation: block.translation ?? null
   };
   if (kind === "lyrics") view.startTime = block.startTime ?? null;
+  if (block.type === "dialogue") view.speaker = block.speaker || "";
   return view;
 }
 
@@ -604,6 +626,7 @@ function collectForm(form, { strict = false } = {}) {
         coverUrl: parsed.coverUrl || "",
         level: parsed.level,
         artist: parsed.artist,
+        topic: parsed.topic,
         youtubeUrl: parsed.youtubeUrl || ""
       };
       return { data, blocks: parsed.blocks };
@@ -619,12 +642,13 @@ function collectForm(form, { strict = false } = {}) {
 function normalizeBlocksArray(parsed) {
   if (!Array.isArray(parsed)) throw new Error("El campo 'blocks' debe ser un array");
   return parsed.map((block) => ({
-    type: block.type === "image" || block.type === "header" ? block.type : "text",
+    type: ["image", "header", "dialogue"].includes(block.type) ? block.type : "text",
     ...(block.id ? { id: block.id } : {}),
     ...(block.content ? { content: block.content } : {}),
     ...(block.translation ? { translation: block.translation } : {}),
     ...(block.url ? { url: block.url } : {}),
     ...(block.caption ? { caption: block.caption } : {}),
+    ...(block.speaker ? { speaker: block.speaker } : {}),
     ...(block.startTime != null && Number.isFinite(Number(block.startTime))
       ? { startTime: Number(block.startTime) }
       : {})
@@ -647,6 +671,7 @@ function parseFullJson(text) {
     coverUrl: typeof parsed.coverUrl === "string" ? parsed.coverUrl : null,
     level: typeof parsed.level === "string" ? parsed.level : undefined,
     artist: typeof parsed.artist === "string" ? parsed.artist : "",
+    topic: typeof parsed.topic === "string" ? parsed.topic : "",
     youtubeUrl: typeof parsed.youtubeUrl === "string" ? parsed.youtubeUrl : null,
     blocks: normalizeBlocksArray(parsed.blocks ?? [])
   };
@@ -661,7 +686,12 @@ function renderPreview(kind, form) {
   title.textContent = data.title || "Sin título";
   const kicker = document.createElement("div");
   kicker.className = "kicker";
-  kicker.textContent = kind === "stories" ? data.level || "Nivel" : data.artist || "Artista";
+  kicker.textContent =
+    kind === "stories"
+      ? data.level || "Nivel"
+      : kind === "lyrics"
+        ? data.artist || "Artista"
+        : data.topic || "Tema";
   pane.append(kicker, title);
 
   if (data.translation) {
@@ -706,6 +736,12 @@ function renderPreview(kind, form) {
       img.alt = block.caption ?? "";
       pane.append(img);
     } else {
+      if (block.type === "dialogue" && block.speaker) {
+        const speaker = document.createElement("div");
+        speaker.className = "preview-speaker";
+        speaker.textContent = block.speaker;
+        pane.append(speaker);
+      }
       pane.append(renderFurigana(block.content ?? ""));
     }
     if (block.translation) {
@@ -825,9 +861,12 @@ function bindEditor(kind, isNew, id) {
         coverUrl: data.coverUrl || null,
         level: data.level || null
       };
-      if (kind !== "stories") {
+      if (kind === "lyrics") {
         obj.artist = data.artist || "";
         obj.youtubeUrl = data.youtubeUrl || null;
+      }
+      if (kind === "conversations") {
+        obj.topic = data.topic || "";
       }
       obj.blocks = blocks.map((block) => blockForJsonView(block, kind));
       fullJsonField.value = JSON.stringify(obj, null, 2);
@@ -846,10 +885,13 @@ function bindEditor(kind, isNew, id) {
       form.elements.coverUrl.value = parsed.coverUrl || "";
       if (kind === "stories") {
         if (parsed.level) form.elements.level.value = parsed.level;
-      } else {
+      } else if (kind === "lyrics") {
         form.elements.level.value = parsed.level || "";
         form.elements.artist.value = parsed.artist || "";
         form.elements.youtubeUrl.value = parsed.youtubeUrl || "";
+      } else {
+        form.elements.level.value = parsed.level || "";
+        form.elements.topic.value = parsed.topic || "";
       }
       blocksRoot.innerHTML = parsed.blocks.map((block, index) => blockEditor(block, index, kind)).join("");
       fullJsonWrap.classList.add("hidden");
@@ -975,11 +1017,15 @@ function bindEditor(kind, isNew, id) {
         block.type === "image" ? Boolean(block.url) : Boolean(block.content)
       )
     };
-    if (kind === "stories") payload.level = data.level;
-    else {
+    if (kind === "stories") {
+      payload.level = data.level;
+    } else if (kind === "lyrics") {
       payload.artist = data.artist;
       payload.level = data.level || null;
       payload.youtubeUrl = data.youtubeUrl || null;
+    } else {
+      payload.topic = data.topic;
+      payload.level = data.level || null;
     }
 
     try {
@@ -1030,9 +1076,14 @@ Sintaxis: [Texto](furigana:lectura.por.kanji)
 
 function renderEditor(kind, item) {
   const isStory = kind === "stories";
+  const isLyric = kind === "lyrics";
+  const isConversation = kind === "conversations";
   const isNew = !item;
-  const title = isNew ? (isStory ? "Nueva historia" : "Nueva letra") : item.title;
-  const blocks = item?.blocks ?? [{ type: "text", content: "", translation: "" }];
+  const newTitle = isStory ? "Nueva historia" : isLyric ? "Nueva letra" : "Nueva conversación";
+  const title = isNew ? newTitle : item.title;
+  const blocks = item?.blocks ?? [
+    isConversation ? { type: "dialogue", speaker: "", content: "", translation: "" } : { type: "text", content: "", translation: "" }
+  ];
 
   app.innerHTML = layout(
     kind,
@@ -1067,7 +1118,7 @@ function renderEditor(kind, item) {
               />
             </label>
             <label class="field">
-              <span>${isStory ? "Nivel" : "Artista"}</span>
+              <span>${isStory ? "Nivel" : isLyric ? "Artista" : "Tema"}</span>
               ${
                 isStory
                   ? `<select name="level">
@@ -1078,7 +1129,9 @@ function renderEditor(kind, item) {
                         )
                         .join("")}
                     </select>`
-                  : `<input name="artist" class="jp" lang="ja" spellcheck="false" autocomplete="off" required value="${escapeHtml(item?.artist)}" />`
+                  : isLyric
+                    ? `<input name="artist" class="jp" lang="ja" spellcheck="false" autocomplete="off" required value="${escapeHtml(item?.artist)}" />`
+                    : `<input name="topic" autocomplete="off" required placeholder="convenience_store" value="${escapeHtml(item?.topic)}" />`
               }
             </label>
           </div>
@@ -1094,12 +1147,12 @@ function renderEditor(kind, item) {
             </div>
           </label>
           ${
-            isStory
-              ? ""
-              : `<label class="field">
+            isLyric
+              ? `<label class="field">
             <span>YouTube</span>
             <input name="youtubeUrl" value="${escapeHtml(item?.youtubeUrl)}" placeholder="https://youtu.be/…" />
           </label>`
+              : ""
           }
           ${
             isStory
@@ -1118,9 +1171,8 @@ function renderEditor(kind, item) {
           </label>`
           }
           ${
-            isStory
-              ? ""
-              : `<div class="time-shift">
+            isLyric
+              ? `<div class="time-shift">
             <label class="field">
               <span>Desplazar todos los timestamps</span>
               <div class="cover-row">
@@ -1131,6 +1183,7 @@ function renderEditor(kind, item) {
             </label>
             <p class="muted">Suma o resta esos segundos a todas las líneas. Luego guarda.</p>
           </div>`
+              : ""
           }
           <div class="row">
             <h2>Bloques</h2>
@@ -1139,6 +1192,11 @@ function renderEditor(kind, item) {
             <button class="ghost" data-add="text" type="button">+ Texto</button>
             <button class="ghost" data-add="header" type="button">+ Encabezado</button>
             <button class="ghost" data-add="image" type="button">+ Imagen</button>
+            ${
+              isConversation
+                ? `<button class="ghost" data-add="dialogue" type="button">+ Diálogo</button>`
+                : ""
+            }
           </div>
           <div id="blocks">${blocks.map((block, index) => blockEditor(block, index, kind)).join("")}</div>
           </div>
@@ -1150,7 +1208,7 @@ function renderEditor(kind, item) {
           <div class="actions">
             <button class="primary" type="submit">Guardar</button>
             ${
-              !isStory && !isNew
+              isLyric && !isNew
                 ? `<button class="ghost" id="resync-times" type="button">Recuperar timestamps</button>`
                 : ""
             }
@@ -1370,6 +1428,11 @@ async function route() {
       renderList("lyrics", list.data);
       return;
     }
+    if (section === "conversations" && !id) {
+      const list = await api("/api/conversations?limit=100");
+      renderList("conversations", list.data);
+      return;
+    }
     if (section === "search") {
       app.innerHTML = layout(
         "search",
@@ -1410,7 +1473,7 @@ async function route() {
       renderImport();
       return;
     }
-    if (section === "stories" || section === "lyrics") {
+    if (section === "stories" || section === "lyrics" || section === "conversations") {
       const item = id === "new" ? null : await api(`/api/${section}/${id}`);
       renderEditor(section, item);
       return;

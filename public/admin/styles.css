@@ -346,6 +346,15 @@ textarea {
   margin: 0.7rem 0 0.15rem;
 }
 
+.preview-speaker {
+  color: var(--seal);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0.7rem 0 0.15rem;
+}
+
 .add-row {
   display: flex;
   flex-wrap: wrap;

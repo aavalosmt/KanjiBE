@@ -33,6 +33,16 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function slugify(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 function isKanji(char) {
   const code = char.codePointAt(0) ?? 0;
   return code >= 0x4e00 && code <= 0x9faf;
@@ -406,7 +416,8 @@ function kindMeta(kind) {
   return { kicker: (item) => item.topic, plural: "Conversaciones", singular: "conversación", lrclib: false };
 }
 
-function renderList(kind, items) {
+function renderList(kind, items, options = {}) {
+  const { topics = [], selectedTopic = "" } = options;
   const meta = kindMeta(kind);
   const cards = items.length
     ? items
@@ -455,11 +466,39 @@ function renderList(kind, items) {
       </section>`
           : ""
       }
+      ${
+        kind === "conversations"
+          ? `<section class="editor pad search-panel">
+        <label class="field">
+          <span>Filtrar por tema</span>
+          <select id="topic-filter">
+            <option value="">Todos</option>
+            ${topics
+              .map(
+                (t) =>
+                  `<option value="${escapeHtml(t.slug)}" ${selectedTopic === t.slug ? "selected" : ""}>${escapeHtml(t.label)}</option>`
+              )
+              .join("")}
+          </select>
+        </label>
+      </section>`
+          : ""
+      }
       <section class="grid">${cards}</section>
     `
   );
   bindLogout();
   if (meta.lrclib) bindLrcLibSearch();
+
+  document.querySelector("#topic-filter")?.addEventListener("change", async (event) => {
+    const topic = event.target.value;
+    try {
+      const list = await api(`/api/conversations?limit=100${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`);
+      renderList("conversations", list.data, { topics, selectedTopic: topic });
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
 
   app.querySelectorAll("[data-del]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -914,7 +953,14 @@ function bindEditor(kind, isNew, id) {
         form.elements.youtubeUrl.value = parsed.youtubeUrl || "";
       } else {
         form.elements.level.value = parsed.level || "";
-        form.elements.topic.value = parsed.topic || "";
+        const topicSelect = form.elements.topic;
+        if (parsed.topic && ![...topicSelect.options].some((opt) => opt.value === parsed.topic)) {
+          const option = document.createElement("option");
+          option.value = parsed.topic;
+          option.textContent = `${parsed.topic} (sin registrar)`;
+          topicSelect.append(option);
+        }
+        topicSelect.value = parsed.topic || "";
       }
       blocksRoot.innerHTML = parsed.blocks.map((block, index) => blockEditor(block, index, kind)).join("");
       fullJsonWrap.classList.add("hidden");
@@ -1026,6 +1072,29 @@ function bindEditor(kind, isNew, id) {
     }
   });
 
+  document.querySelector("#add-topic")?.addEventListener("click", async () => {
+    const label = prompt("Nombre del nuevo tema (ej. Aeropuerto)");
+    if (!label) return;
+    const slug = prompt("Slug (snake_case, ej. airport)", slugify(label));
+    if (!slug) return;
+    try {
+      const topic = await api("/api/admin/topics", {
+        method: "POST",
+        body: JSON.stringify({ slug, label })
+      });
+      const select = form.elements.topic;
+      select.querySelectorAll('option[value=""]').forEach((opt) => opt.remove());
+      const option = document.createElement("option");
+      option.value = topic.slug;
+      option.textContent = topic.label;
+      option.selected = true;
+      select.append(option);
+      toast("Tema creado", "ok");
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     let data, blocks;
@@ -1100,7 +1169,7 @@ Sintaxis: [Texto](furigana:lectura.por.kanji)
 - Usa la lectura real de esa palabra en ese contexto (on'yomi/kun'yomi
   según corresponda), no inventes lecturas.`;
 
-function renderEditor(kind, item) {
+function renderEditor(kind, item, topics = []) {
   const isStory = kind === "stories";
   const isLyric = kind === "lyrics";
   const isConversation = kind === "conversations";
@@ -1110,6 +1179,17 @@ function renderEditor(kind, item) {
   const blocks = item?.blocks ?? [
     isConversation ? { type: "dialogue", speaker: "", content: "", translation: "" } : { type: "text", content: "", translation: "" }
   ];
+  const hasRegisteredTopic = item?.topic && topics.some((t) => t.slug === item.topic);
+  const topicOptions = [
+    `<option value="" ${item?.topic ? "" : "selected"} disabled>Elige un tema…</option>`,
+    ...topics.map(
+      (t) =>
+        `<option value="${escapeHtml(t.slug)}" ${item?.topic === t.slug ? "selected" : ""}>${escapeHtml(t.label)}</option>`
+    ),
+    item?.topic && !hasRegisteredTopic
+      ? `<option value="${escapeHtml(item.topic)}" selected>${escapeHtml(item.topic)} (sin registrar)</option>`
+      : ""
+  ].join("");
 
   app.innerHTML = layout(
     kind,
@@ -1157,7 +1237,10 @@ function renderEditor(kind, item) {
                     </select>`
                   : isLyric
                     ? `<input name="artist" class="jp" lang="ja" spellcheck="false" autocomplete="off" required value="${escapeHtml(item?.artist)}" />`
-                    : `<input name="topic" autocomplete="off" required placeholder="convenience_store" value="${escapeHtml(item?.topic)}" />`
+                    : `<div class="cover-row">
+                        <select name="topic" required>${topicOptions}</select>
+                        <button class="ghost" id="add-topic" type="button">+ Nuevo</button>
+                      </div>`
               }
             </label>
           </div>
@@ -1484,8 +1567,11 @@ async function route() {
       return;
     }
     if (section === "conversations" && !id) {
-      const list = await api("/api/conversations?limit=100");
-      renderList("conversations", list.data);
+      const [list, topics] = await Promise.all([
+        api("/api/conversations?limit=100"),
+        api("/api/topics")
+      ]);
+      renderList("conversations", list.data, { topics: topics.data });
       return;
     }
     if (section === "search") {
@@ -1529,8 +1615,11 @@ async function route() {
       return;
     }
     if (section === "stories" || section === "lyrics" || section === "conversations") {
-      const item = id === "new" ? null : await api(`/api/${section}/${id}`);
-      renderEditor(section, item);
+      const [item, topics] = await Promise.all([
+        id === "new" ? Promise.resolve(null) : api(`/api/${section}/${id}`),
+        section === "conversations" ? api("/api/topics") : Promise.resolve(null)
+      ]);
+      renderEditor(section, item, topics?.data ?? []);
       return;
     }
     go("/stories");

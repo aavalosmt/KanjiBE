@@ -37,6 +37,7 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/lyrics/:id` — incluye `youtubeUrl` y `startTime` por verso si vino de LRCLib
 - `GET /api/conversations?page=1&limit=20&topic=convenience_store&level=N4`
 - `GET /api/conversations/:id` — bloques `type: "dialogue"` con `speaker` por turno
+- `GET /api/topics` — lista de temas registrados (`{ id, slug, label }`), para poblar filtros. El `topic` de una conversación debe ser un `slug` ya registrado aquí.
 - Admin: `GET /api/admin/lrclib/search?q=` y `POST /api/admin/lrclib/import` `{ id }` — busca, sincroniza, tokeniza y guarda
 - `GET /health`
 - `GET /api/lookup?q=知らない` — lematiza (知る) y describe el verbo en inglés (`godan verb 知る in the negative form`). También `GET /api/lookup/知らない`.
@@ -57,6 +58,7 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
 - `POST /api/admin/conversations`
 - `PUT /api/admin/conversations/:id`
 - `DELETE /api/admin/conversations/:id`
+- `POST /api/admin/topics` `{ slug, label }` — `slug` en snake_case; 409 si ya existe
 - `POST /api/admin/upload` — `multipart/form-data` con campo `file` o `image`
 
 ## Hosting (Railway)

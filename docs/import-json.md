@@ -38,7 +38,9 @@ Igual, pero `artist` en vez de `level`. `youtubeUrl` es opcional (`https://youtu
 
 ## Conversation
 
-Igual, pero `topic` (obligatorio, slug corto en snake_case, p. ej. `convenience_store`, `immigration_interview`) en vez de `level`. `level` es opcional, igual que en Lyric.
+Igual, pero `topic` (obligatorio) en vez de `level`. `level` es opcional, igual que en Lyric.
+
+`topic` no es texto libre: debe ser el `slug` de un tema ya registrado (ver `GET /api/topics`). Si el slug no existe, ese item del batch falla con un error individual ("Unknown topic…") sin tumbar el resto del import. Crea el tema antes con `POST /api/admin/topics { "slug", "label" }`, o desde el botón "+ Nuevo" en el selector de tema del panel admin.
 
 ## Bloques
 

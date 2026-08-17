@@ -12,6 +12,7 @@ import { conversationsRouter } from "./routes/conversations.js";
 import { lookupRouter } from "./routes/lookup.js";
 import { lyricsRouter } from "./routes/lyrics.js";
 import { storiesRouter } from "./routes/stories.js";
+import { topicsRouter } from "./routes/topics.js";
 import { uploadRouter } from "./routes/upload.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -66,6 +67,7 @@ export function createApp() {
   app.use("/api/stories", storiesRouter);
   app.use("/api/lyrics", lyricsRouter);
   app.use("/api/conversations", conversationsRouter);
+  app.use("/api/topics", topicsRouter);
   app.use("/api/lookup", lookupRouter);
   app.use("/api/analyze", analyzeRouter);
   app.use("/api/admin", adminRouter);

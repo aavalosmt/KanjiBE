@@ -24,7 +24,8 @@ import {
   normalizeImportPayload,
   parseBlocks,
   storyCreateSchema,
-  storyUpdateSchema
+  storyUpdateSchema,
+  topicCreateSchema
 } from "../validators.js";
 
 export const adminRouter = Router();
@@ -219,6 +220,10 @@ adminRouter.post("/import", async (req, res) => {
 
   for (const [index, item] of payload.conversations.entries()) {
     try {
+      const topicError = await unknownTopicMessage(item.topic);
+      if (topicError) {
+        throw new Error(topicError);
+      }
       const data = {
         title: item.title,
         topic: item.topic,
@@ -435,6 +440,12 @@ adminRouter.delete("/lyrics/:id", async (req, res) => {
 adminRouter.post("/conversations", async (req, res) => {
   const payload = conversationCreateSchema.parse(req.body);
 
+  const topicError = await unknownTopicMessage(payload.topic);
+  if (topicError) {
+    res.status(400).json({ error: topicError });
+    return;
+  }
+
   try {
     const conversation = await prisma.conversation.create({
       data: {
@@ -459,6 +470,14 @@ adminRouter.post("/conversations", async (req, res) => {
 
 adminRouter.put("/conversations/:id", async (req, res) => {
   const payload = conversationUpdateSchema.parse(req.body);
+
+  if (payload.topic) {
+    const topicError = await unknownTopicMessage(payload.topic);
+    if (topicError) {
+      res.status(400).json({ error: topicError });
+      return;
+    }
+  }
 
   try {
     const conversation = await prisma.conversation.update({
@@ -489,6 +508,26 @@ adminRouter.delete("/conversations/:id", async (req, res) => {
   } catch (error) {
     if (isNotFound(error)) {
       res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+    throw error;
+  }
+});
+
+async function unknownTopicMessage(slug: string): Promise<string | null> {
+  const topic = await prisma.topic.findUnique({ where: { slug } });
+  return topic ? null : `Unknown topic "${slug}". Create it first via POST /api/admin/topics.`;
+}
+
+adminRouter.post("/topics", async (req, res) => {
+  const payload = topicCreateSchema.parse(req.body);
+
+  try {
+    const topic = await prisma.topic.create({ data: payload });
+    res.status(201).json(topic);
+  } catch (error) {
+    if (isUniqueConstraint(error)) {
+      res.status(409).json({ error: "Topic slug already exists" });
       return;
     }
     throw error;

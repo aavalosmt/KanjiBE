@@ -29,14 +29,19 @@ async function hasColumn(table: string, column: string): Promise<boolean> {
 
 async function ensureTables() {
   const names = new Set(await tableNames());
-  if (names.has("Story") && names.has("Lyric") && names.has("Conversation")) {
+  if (
+    names.has("Story") &&
+    names.has("Lyric") &&
+    names.has("Conversation") &&
+    names.has("Topic")
+  ) {
     if (!(await hasColumn("Lyric", "youtubeUrl"))) {
       await prisma.$executeRawUnsafe(`ALTER TABLE "Lyric" ADD COLUMN "youtubeUrl" TEXT`);
     }
     return;
   }
 
-  console.warn("Story/Lyric/Conversation missing after migrate; creating tables on this connection");
+  console.warn("Story/Lyric/Conversation/Topic missing after migrate; creating tables on this connection");
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Story" (
       "id" TEXT NOT NULL PRIMARY KEY,
@@ -74,6 +79,17 @@ async function ensureTables() {
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL
     )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Topic" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "slug" TEXT NOT NULL,
+      "label" TEXT NOT NULL,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "Topic_slug_key" ON "Topic"("slug")
   `);
 }
 

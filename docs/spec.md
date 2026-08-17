@@ -64,11 +64,13 @@ See `GET /api/lyrics/:id` and the seed data in `prisma/seed.ts`.
 
 A scripted chat-style dialogue between two or more speakers (e.g. a convenience store transaction, an immigration interview), grouped by a `topic` for browsing/filtering. Turns use `blocks` of `type: "dialogue"`, each carrying a `speaker` label alongside the usual furigana-tokenized `content` and `translation`. See `GET /api/conversations/:id`.
 
+`topic` is not free text: it must be the `slug` of an existing Topic (see 3.5). Creating or updating a Conversation with an unregistered topic slug is rejected with `400`.
+
 ```json
 {
   "id": "String (UUID)",
   "title": "String",
-  "topic": "String (e.g. \"convenience_store\", \"immigration\")",
+  "topic": "String (slug of a registered Topic, e.g. \"convenience_store\", \"immigration\")",
   "level": "String (Optional JLPT level)",
   "translation": "String (Optional)",
   "coverUrl": "String (Optional)",
@@ -78,10 +80,23 @@ A scripted chat-style dialogue between two or more speakers (e.g. a convenience 
 }
 ```
 
+### 3.5 Topic Entity
+
+A small managed registry acting as an enum of valid conversation topics/scenarios, so clients can build filter UIs and so `Conversation.topic` values stay consistent instead of free text. See `GET /api/topics`.
+
+```json
+{
+  "id": "String (UUID)",
+  "slug": "String (snake_case, unique, e.g. \"convenience_store\")",
+  "label": "String (display name, e.g. \"Convenience Store\")"
+}
+```
+
 ## 4. REST API Specification
 
 Implemented in this repository:
 
-- Public: `GET /api/stories`, `GET /api/stories/:id`, `GET /api/lyrics`, `GET /api/lyrics/:id`, `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/lookup?q=`
+- Public: `GET /api/stories`, `GET /api/stories/:id`, `GET /api/lyrics`, `GET /api/lyrics/:id`, `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/topics`, `GET /api/lookup?q=`
   - `GET /api/conversations` accepts `?topic=` and `?level=` query filters, plus `?page=`/`?limit=` pagination, matching the Story/Lyric list endpoints.
-- Admin: `POST|PUT|DELETE /api/admin/stories`, `POST|PUT|DELETE /api/admin/lyrics`, `POST|PUT|DELETE /api/admin/conversations`, `POST /api/admin/upload`
+  - `GET /api/topics` returns all registered topics sorted by `label`, for building filter UIs.
+- Admin: `POST|PUT|DELETE /api/admin/stories`, `POST|PUT|DELETE /api/admin/lyrics`, `POST|PUT|DELETE /api/admin/conversations`, `POST /api/admin/topics`, `POST /api/admin/upload`

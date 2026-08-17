@@ -149,6 +149,17 @@ export const conversationUpdateSchema = z
     message: "At least one field is required"
   });
 
+export const topicSlug = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[a-z0-9]+(_[a-z0-9]+)*$/, "slug must be snake_case (lowercase letters, numbers, underscores)");
+
+export const topicCreateSchema = z.object({
+  slug: topicSlug,
+  label: z.string().trim().min(1)
+});
+
 export function normalizeBlocks(
   blocks: z.infer<typeof blockSchema>[]
 ): ContentBlock[] {

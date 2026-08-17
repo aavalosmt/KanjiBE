@@ -58,6 +58,18 @@ async function main() {
     }
   });
 
+  for (const topic of [
+    { slug: "convenience_store", label: "Convenience Store" },
+    { slug: "immigration_interview", label: "Immigration Interview" },
+    { slug: "train_station", label: "Train Station" }
+  ]) {
+    await prisma.topic.upsert({
+      where: { slug: topic.slug },
+      update: {},
+      create: topic
+    });
+  }
+
   await prisma.conversation.upsert({
     where: { id: "conv-konbini" },
     update: {},

@@ -83,6 +83,14 @@ beforeEach(async () => {
   await prisma.lyric.deleteMany();
   await prisma.story.deleteMany();
   await prisma.conversation.deleteMany();
+  await prisma.topic.deleteMany();
+  await prisma.topic.createMany({
+    data: [
+      { slug: "convenience_store", label: "Convenience Store" },
+      { slug: "immigration", label: "Immigration" },
+      { slug: "train_station", label: "Train Station" }
+    ]
+  });
 });
 
 afterAll(async () => {
@@ -230,6 +238,21 @@ describe("public conversations", () => {
     const res = await request(app).get("/api/conversations/missing");
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: "Conversation not found" });
+  });
+});
+
+describe("public topics", () => {
+  it("lists topics sorted by label", async () => {
+    const res = await request(app).get("/api/topics");
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((t: { slug: string }) => t.slug).sort()).toEqual(
+      ["convenience_store", "immigration", "train_station"].sort()
+    );
+    expect(res.body.data[0]).toMatchObject({
+      id: expect.any(String),
+      slug: expect.any(String),
+      label: expect.any(String)
+    });
   });
 });
 
@@ -391,6 +414,77 @@ describe("admin conversations", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("Validation failed");
   });
+
+  it("rejects an unregistered topic on create", async () => {
+    const res = await request(app)
+      .post("/api/admin/conversations")
+      .set(admin)
+      .send({ ...conversationPayload, id: "conv-unknown-topic", topic: "not_a_real_topic" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Unknown topic/);
+  });
+
+  it("rejects an unregistered topic on update", async () => {
+    await request(app).post("/api/admin/conversations").set(admin).send(conversationPayload);
+
+    const res = await request(app)
+      .put("/api/admin/conversations/conv-789")
+      .set(admin)
+      .send({ topic: "not_a_real_topic" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Unknown topic/);
+
+    const unchanged = await request(app).get("/api/conversations/conv-789");
+    expect(unchanged.body.topic).toBe("convenience_store");
+  });
+});
+
+describe("admin topics", () => {
+  it("rejects requests without an admin key", async () => {
+    const res = await request(app)
+      .post("/api/admin/topics")
+      .send({ slug: "airport", label: "Airport" });
+    expect(res.status).toBe(401);
+  });
+
+  it("creates a topic and rejects a duplicate slug", async () => {
+    const created = await request(app)
+      .post("/api/admin/topics")
+      .set(admin)
+      .send({ slug: "airport", label: "Airport" });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ slug: "airport", label: "Airport" });
+
+    const listed = await request(app).get("/api/topics");
+    expect(listed.body.data.some((t: { slug: string }) => t.slug === "airport")).toBe(true);
+
+    const duplicate = await request(app)
+      .post("/api/admin/topics")
+      .set(admin)
+      .send({ slug: "airport", label: "Airport (again)" });
+    expect(duplicate.status).toBe(409);
+  });
+
+  it("rejects a slug that is not snake_case", async () => {
+    const res = await request(app)
+      .post("/api/admin/topics")
+      .set(admin)
+      .send({ slug: "Not Snake Case!", label: "Bad" });
+    expect(res.status).toBe(400);
+  });
+
+  it("lets a newly created topic be used by a conversation", async () => {
+    await request(app).post("/api/admin/topics").set(admin).send({ slug: "airport", label: "Airport" });
+
+    const res = await request(app)
+      .post("/api/admin/conversations")
+      .set(admin)
+      .send({ ...conversationPayload, id: "conv-airport", topic: "airport" });
+    expect(res.status).toBe(201);
+    expect(res.body.topic).toBe("airport");
+  });
 });
 
 describe("admin tokenize", () => {
@@ -494,6 +588,29 @@ describe("admin import", () => {
       title: "駅で",
       topic: "train_station"
     });
+  });
+
+  it("reports a per-item error for an unregistered topic instead of failing the whole batch", async () => {
+    const res = await request(app)
+      .post("/api/admin/import")
+      .set(admin)
+      .send({
+        stories: [{ title: "川", level: "N5", blocks: [{ type: "text", content: "[川](furigana:かわ)" }] }],
+        conversations: [
+          {
+            title: "Bad topic",
+            topic: "not_a_real_topic",
+            blocks: [{ type: "dialogue", speaker: "A", content: "テスト" }]
+          }
+        ]
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.created.stories).toHaveLength(1);
+    expect(res.body.created.conversations).toHaveLength(0);
+    expect(res.body.errors).toHaveLength(1);
+    expect(res.body.errors[0]).toMatchObject({ type: "conversation", index: 0 });
+    expect(res.body.errors[0].error).toMatch(/Unknown topic/);
   });
 });
 

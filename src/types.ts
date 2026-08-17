@@ -70,6 +70,12 @@ export type Conversation = ConversationSummary & {
   updatedAt: string;
 };
 
+export type Topic = {
+  id: string;
+  slug: string;
+  label: string;
+};
+
 export type Paginated<T> = {
   data: T[];
   pagination: {

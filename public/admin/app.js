@@ -891,6 +891,10 @@ function bindEditor(kind, isNew, id) {
       fullJsonField.value = JSON.stringify(obj, null, 2);
       formFields.classList.add("hidden");
       fullJsonWrap.classList.remove("hidden");
+      formFields.querySelectorAll("[required]").forEach((field) => {
+        field.dataset.wasRequired = "true";
+        field.required = false;
+      });
     } else {
       let parsed;
       try {
@@ -915,6 +919,9 @@ function bindEditor(kind, isNew, id) {
       blocksRoot.innerHTML = parsed.blocks.map((block, index) => blockEditor(block, index, kind)).join("");
       fullJsonWrap.classList.add("hidden");
       formFields.classList.remove("hidden");
+      formFields.querySelectorAll("[data-was-required]").forEach((field) => {
+        field.required = true;
+      });
       reindex();
       refreshPreview();
     }

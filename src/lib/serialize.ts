@@ -1,4 +1,12 @@
-import type { ContentBlock, Lyric, LyricSummary, Story, StorySummary } from "../types.js";
+import type {
+  Conversation,
+  ConversationSummary,
+  ContentBlock,
+  Lyric,
+  LyricSummary,
+  Story,
+  StorySummary
+} from "../types.js";
 import { analyzeBlock } from "./kuromoji.js";
 import { preserveStartTimes } from "./timestamps.js";
 import { normalizeBlocks, parseBlocks, type blockSchema } from "../validators.js";
@@ -15,7 +23,10 @@ export async function persistBlocks(
 export async function enrichBlocksWithTokens(blocks: ContentBlock[]): Promise<ContentBlock[]> {
   return Promise.all(
     blocks.map(async (block) => {
-      if ((block.type !== "text" && block.type !== "header") || !block.content) {
+      if (
+        (block.type !== "text" && block.type !== "header" && block.type !== "dialogue") ||
+        !block.content
+      ) {
         return block;
       }
       try {
@@ -81,6 +92,18 @@ type LyricRecord = {
   updatedAt?: Date;
 };
 
+type ConversationRecord = {
+  id: string;
+  title: string;
+  topic: string;
+  level?: string | null;
+  translation: string | null;
+  coverUrl: string | null;
+  blocks?: unknown;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
 export function toStorySummary(story: StoryRecord): StorySummary {
   return {
     id: story.id,
@@ -118,5 +141,28 @@ export function toLyric(lyric: Required<Pick<LyricRecord, "blocks" | "createdAt"
     blocks: parseBlocks(deserializeBlocks(lyric.blocks)),
     createdAt: lyric.createdAt.toISOString(),
     updatedAt: lyric.updatedAt.toISOString()
+  };
+}
+
+export function toConversationSummary(conversation: ConversationRecord): ConversationSummary {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    topic: conversation.topic,
+    level: conversation.level ?? null,
+    translation: conversation.translation,
+    coverUrl: conversation.coverUrl
+  };
+}
+
+export function toConversation(
+  conversation: Required<Pick<ConversationRecord, "blocks" | "createdAt" | "updatedAt">> &
+    ConversationRecord
+): Conversation {
+  return {
+    ...toConversationSummary(conversation),
+    blocks: parseBlocks(deserializeBlocks(conversation.blocks)),
+    createdAt: conversation.createdAt.toISOString(),
+    updatedAt: conversation.updatedAt.toISOString()
   };
 }

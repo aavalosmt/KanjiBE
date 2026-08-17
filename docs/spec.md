@@ -1,8 +1,8 @@
-# Backend & Client Technical Specification: Interactive Reader Engine (Stories & Lyrics)
+# Backend & Client Technical Specification: Interactive Reader Engine (Stories, Lyrics & Conversations)
 
 ## 1. Executive Summary & Overview
 
-This document outlines the end-to-end technical specification for a Node.js REST API and an iOS client (SwiftUI) reader module designed for Japanese language learning. Content (Stories and Song Lyrics) utilizes a Block-Based Content Architecture containing custom tokenized Markdown text with furigana annotations, inline image media, and bilingual translations.
+This document outlines the end-to-end technical specification for a Node.js REST API and an iOS client (SwiftUI) reader module designed for Japanese language learning. Content (Stories, Song Lyrics, and Conversations) utilizes a Block-Based Content Architecture containing custom tokenized Markdown text with furigana annotations, inline image media, dialogue turns, and bilingual translations.
 
 ## 2. Text Syntax & Furigana Alignment (Client Rules)
 
@@ -42,11 +42,12 @@ The API stores this syntax as-is. Alignment is a client concern.
 ```json
 {
   "id": "String (UUID)",
-  "type": "text | image | header",
-  "content": "String (Tokenized Markdown text if type == text or header)",
+  "type": "text | image | header | dialogue",
+  "content": "String (Tokenized Markdown text if type == text, header, or dialogue)",
   "translation": "String (Optional - Spanish/English translation of the block)",
   "url": "String (Only if type == image)",
-  "caption": "String (Optional)"
+  "caption": "String (Optional)",
+  "speaker": "String (Required if type == dialogue, e.g. \"Clerk\", \"You\")"
 }
 ```
 
@@ -58,9 +59,28 @@ See `GET /api/stories/:id` and the seed data in `prisma/seed.ts`.
 
 See `GET /api/lyrics/:id` and the seed data in `prisma/seed.ts`.
 
+### 3.4 Conversation Entity
+
+A scripted chat-style dialogue between two or more speakers (e.g. a convenience store transaction, an immigration interview), grouped by a `topic` for browsing/filtering. Turns use `blocks` of `type: "dialogue"`, each carrying a `speaker` label alongside the usual furigana-tokenized `content` and `translation`. See `GET /api/conversations/:id`.
+
+```json
+{
+  "id": "String (UUID)",
+  "title": "String",
+  "topic": "String (e.g. \"convenience_store\", \"immigration\")",
+  "level": "String (Optional JLPT level)",
+  "translation": "String (Optional)",
+  "coverUrl": "String (Optional)",
+  "blocks": "Block[]",
+  "createdAt": "ISO 8601 DateTime",
+  "updatedAt": "ISO 8601 DateTime"
+}
+```
+
 ## 4. REST API Specification
 
 Implemented in this repository:
 
-- Public: `GET /api/stories`, `GET /api/stories/:id`, `GET /api/lyrics`, `GET /api/lyrics/:id`, `GET /api/lookup?q=`
-- Admin: `POST|PUT|DELETE /api/admin/stories`, `POST|PUT|DELETE /api/admin/lyrics`, `POST /api/admin/upload`
+- Public: `GET /api/stories`, `GET /api/stories/:id`, `GET /api/lyrics`, `GET /api/lyrics/:id`, `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/lookup?q=`
+  - `GET /api/conversations` accepts `?topic=` and `?level=` query filters, plus `?page=`/`?limit=` pagination, matching the Story/Lyric list endpoints.
+- Admin: `POST|PUT|DELETE /api/admin/stories`, `POST|PUT|DELETE /api/admin/lyrics`, `POST|PUT|DELETE /api/admin/conversations`, `POST /api/admin/upload`

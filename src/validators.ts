@@ -31,11 +31,12 @@ export const blockTokenSchema = z.object({
 export const blockSchema = z
   .object({
     id: z.string().trim().min(1).optional(),
-    type: z.enum(["text", "image", "header"]),
+    type: z.enum(["text", "image", "header", "dialogue"]),
     content: optionalText,
     translation: optionalText,
     url: z.string().trim().min(1).optional(),
     caption: optionalText,
+    speaker: optionalText,
     tokens: z.array(blockTokenSchema).optional(),
     startTime: z.preprocess((value) => {
       if (value === "" || value === undefined) return undefined;
@@ -58,6 +59,23 @@ export const blockSchema = z
         message: "url is required for image blocks",
         path: ["url"]
       });
+    }
+
+    if (block.type === "dialogue") {
+      if (!block.content) {
+        ctx.addIssue({
+          code: "custom",
+          message: "content is required for dialogue blocks",
+          path: ["content"]
+        });
+      }
+      if (!block.speaker) {
+        ctx.addIssue({
+          code: "custom",
+          message: "speaker is required for dialogue blocks",
+          path: ["speaker"]
+        });
+      }
     }
   });
 
@@ -107,6 +125,29 @@ export const lyricUpdateSchema = z
     message: "At least one field is required"
   });
 
+export const conversationCreateSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  title: z.string().trim().min(1),
+  topic: z.string().trim().min(1),
+  level: nullableText,
+  translation: nullableText,
+  coverUrl: nullableText,
+  blocks: z.array(blockSchema).default([])
+});
+
+export const conversationUpdateSchema = z
+  .object({
+    title: optionalText,
+    topic: optionalText,
+    level: nullableText,
+    translation: nullableText,
+    coverUrl: nullableText,
+    blocks: z.array(blockSchema).optional()
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required"
+  });
+
 export function normalizeBlocks(
   blocks: z.infer<typeof blockSchema>[]
 ): ContentBlock[] {
@@ -120,6 +161,7 @@ export function normalizeBlocks(
     if (block.translation) normalized.translation = block.translation;
     if (block.url) normalized.url = block.url;
     if (block.caption) normalized.caption = block.caption;
+    if (block.speaker) normalized.speaker = block.speaker;
     if (block.tokens?.length) normalized.tokens = block.tokens;
     if (block.startTime != null) normalized.startTime = block.startTime;
 

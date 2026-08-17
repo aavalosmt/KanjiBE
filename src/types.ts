@@ -1,4 +1,4 @@
-export type BlockType = "text" | "image" | "header";
+export type BlockType = "text" | "image" | "header" | "dialogue";
 
 export type BlockToken = {
   surface: string;
@@ -19,6 +19,7 @@ export type ContentBlock = {
   translation?: string;
   url?: string;
   caption?: string;
+  speaker?: string;
   tokens?: BlockToken[];
   startTime?: number | null;
 };
@@ -48,6 +49,21 @@ export type LyricSummary = {
 };
 
 export type Lyric = LyricSummary & {
+  blocks: ContentBlock[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  topic: string;
+  level: string | null;
+  translation: string | null;
+  coverUrl: string | null;
+};
+
+export type Conversation = ConversationSummary & {
   blocks: ContentBlock[];
   createdAt: string;
   updatedAt: string;

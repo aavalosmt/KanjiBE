@@ -10,11 +10,14 @@ import {
   deserializeBlocks,
   persistBlocks,
   preserveStartTimes,
+  toConversation,
   toLyric,
   toStory
 } from "../lib/serialize.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
+  conversationCreateSchema,
+  conversationUpdateSchema,
   importSchema,
   lyricCreateSchema,
   lyricUpdateSchema,
@@ -372,6 +375,69 @@ adminRouter.delete("/lyrics/:id", async (req, res) => {
   } catch (error) {
     if (isNotFound(error)) {
       res.status(404).json({ error: "Lyric not found" });
+      return;
+    }
+    throw error;
+  }
+});
+
+adminRouter.post("/conversations", async (req, res) => {
+  const payload = conversationCreateSchema.parse(req.body);
+
+  try {
+    const conversation = await prisma.conversation.create({
+      data: {
+        id: payload.id,
+        title: payload.title,
+        topic: payload.topic,
+        level: payload.level ?? null,
+        translation: payload.translation ?? null,
+        coverUrl: payload.coverUrl ?? null,
+        blocks: await persistBlocks(payload.blocks)
+      }
+    });
+    res.status(201).json(toConversation(conversation));
+  } catch (error) {
+    if (isUniqueConstraint(error)) {
+      res.status(409).json({ error: "Conversation id already exists" });
+      return;
+    }
+    throw error;
+  }
+});
+
+adminRouter.put("/conversations/:id", async (req, res) => {
+  const payload = conversationUpdateSchema.parse(req.body);
+
+  try {
+    const conversation = await prisma.conversation.update({
+      where: { id: req.params.id },
+      data: {
+        title: payload.title,
+        topic: payload.topic,
+        level: payload.level,
+        translation: payload.translation,
+        coverUrl: payload.coverUrl,
+        blocks: payload.blocks ? await persistBlocks(payload.blocks) : undefined
+      }
+    });
+    res.json(toConversation(conversation));
+  } catch (error) {
+    if (isNotFound(error)) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+    throw error;
+  }
+});
+
+adminRouter.delete("/conversations/:id", async (req, res) => {
+  try {
+    await prisma.conversation.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  } catch (error) {
+    if (isNotFound(error)) {
+      res.status(404).json({ error: "Conversation not found" });
       return;
     }
     throw error;

@@ -53,9 +53,35 @@ const lyricPayload = {
   ]
 };
 
+const conversationPayload = {
+  id: "conv-789",
+  title: "コンビニで",
+  topic: "convenience_store",
+  level: "N4",
+  translation: "At the convenience store",
+  coverUrl: "https://cdn.tuapp.com/covers/conv1.jpg",
+  blocks: [
+    {
+      id: "b1",
+      type: "dialogue",
+      speaker: "Clerk",
+      content: "[いらっしゃいませ](furigana:いらっしゃいませ)",
+      translation: "Welcome!"
+    },
+    {
+      id: "b2",
+      type: "dialogue",
+      speaker: "Customer",
+      content: "[袋](furigana:ふくろ)は[いりません](furigana:いりません)",
+      translation: "I don't need a bag"
+    }
+  ]
+};
+
 beforeEach(async () => {
   await prisma.lyric.deleteMany();
   await prisma.story.deleteMany();
+  await prisma.conversation.deleteMany();
 });
 
 afterAll(async () => {
@@ -159,6 +185,50 @@ describe("public lyrics", () => {
     const detail = await request(app).get("/api/lyrics/song-456");
     expect(detail.status).toBe(200);
     expect(detail.body.blocks[1].content).toContain("furigana:に.げ.だ.さ");
+  });
+});
+
+describe("public conversations", () => {
+  it("lists summaries with pagination and topic filter", async () => {
+    await request(app).post("/api/admin/conversations").set(admin).send(conversationPayload);
+    await request(app).post("/api/admin/conversations").set(admin).send({
+      ...conversationPayload,
+      id: "conv-immigration",
+      topic: "immigration",
+      title: "入国審査"
+    });
+
+    const all = await request(app).get("/api/conversations?page=1&limit=20");
+    expect(all.status).toBe(200);
+    expect(all.body.pagination).toEqual({ page: 1, limit: 20, total: 2 });
+    expect(all.body.data).toHaveLength(2);
+    expect(all.body.data[0]).not.toHaveProperty("blocks");
+
+    const filtered = await request(app).get("/api/conversations?topic=convenience_store");
+    expect(filtered.body.pagination.total).toBe(1);
+    expect(filtered.body.data[0]).toMatchObject({
+      id: "conv-789",
+      title: "コンビニで",
+      topic: "convenience_store",
+      level: "N4"
+    });
+  });
+
+  it("returns a full conversation by id", async () => {
+    await request(app).post("/api/admin/conversations").set(admin).send(conversationPayload);
+
+    const res = await request(app).get("/api/conversations/conv-789");
+    expect(res.status).toBe(200);
+    expect(res.body.blocks).toHaveLength(2);
+    expect(res.body.blocks[0]).toMatchObject({ speaker: "Clerk", type: "dialogue" });
+    expect(res.body.createdAt).toBeTruthy();
+    expect(res.body.updatedAt).toBeTruthy();
+  });
+
+  it("returns 404 for a missing conversation", async () => {
+    const res = await request(app).get("/api/conversations/missing");
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: "Conversation not found" });
   });
 });
 
@@ -269,6 +339,55 @@ describe("admin lyrics", () => {
     expect(updated.status).toBe(200);
     expect(updated.body.translation).toBe("Idol - YOASOBI");
     expect(updated.body.blocks[0].startTime).toBe(0.96);
+  });
+});
+
+describe("admin conversations", () => {
+  it("rejects requests without an admin key", async () => {
+    const res = await request(app).post("/api/admin/conversations").send(conversationPayload);
+    expect(res.status).toBe(401);
+  });
+
+  it("creates, updates, and deletes a conversation", async () => {
+    const created = await request(app)
+      .post("/api/admin/conversations")
+      .set(admin)
+      .send(conversationPayload);
+    expect(created.status).toBe(201);
+    expect(created.body.blocks[0]).toMatchObject({
+      type: "dialogue",
+      speaker: "Clerk"
+    });
+
+    const updated = await request(app)
+      .put("/api/admin/conversations/conv-789")
+      .set(admin)
+      .send({ title: "コンビニで updated" });
+    expect(updated.status).toBe(200);
+    expect(updated.body.title).toBe("コンビニで updated");
+    expect(updated.body.blocks).toHaveLength(2);
+
+    const deleted = await request(app)
+      .delete("/api/admin/conversations/conv-789")
+      .set(admin);
+    expect(deleted.status).toBe(204);
+
+    const missing = await request(app).get("/api/conversations/conv-789");
+    expect(missing.status).toBe(404);
+  });
+
+  it("validates dialogue blocks require a speaker", async () => {
+    const res = await request(app)
+      .post("/api/admin/conversations")
+      .set(admin)
+      .send({
+        title: "Bad",
+        topic: "convenience_store",
+        blocks: [{ type: "dialogue", content: "no speaker" }]
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Validation failed");
   });
 });
 

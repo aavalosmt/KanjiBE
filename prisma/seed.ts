@@ -57,6 +57,44 @@ async function main() {
       ])
     }
   });
+
+  await prisma.conversation.upsert({
+    where: { id: "conv-konbini" },
+    update: {},
+    create: {
+      id: "conv-konbini",
+      title: "コンビニで",
+      topic: "convenience_store",
+      level: "N4",
+      translation: "At the convenience store",
+      coverUrl: "https://cdn.tuapp.com/covers/conv-konbini.jpg",
+      blocks: JSON.stringify([
+        {
+          id: "b1",
+          type: "dialogue",
+          speaker: "Clerk",
+          content: "[いらっしゃいませ](furigana:いらっしゃいませ)",
+          translation: "Welcome!"
+        },
+        {
+          id: "b2",
+          type: "dialogue",
+          speaker: "Customer",
+          content:
+            "[袋](furigana:ふくろ)は[いりません](furigana:いりません)",
+          translation: "I don't need a bag"
+        },
+        {
+          id: "b3",
+          type: "dialogue",
+          speaker: "Clerk",
+          content:
+            "[かしこまりました](furigana:かしこまりました)。[以上](furigana:い.じょう)でよろしいですか？",
+          translation: "Understood. Will that be all?"
+        }
+      ])
+    }
+  });
 }
 
 main()

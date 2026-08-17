@@ -8,6 +8,7 @@ import { config } from "./config.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminRouter } from "./routes/admin.js";
 import { analyzeRouter } from "./routes/analyze.js";
+import { conversationsRouter } from "./routes/conversations.js";
 import { lookupRouter } from "./routes/lookup.js";
 import { lyricsRouter } from "./routes/lyrics.js";
 import { storiesRouter } from "./routes/stories.js";
@@ -64,6 +65,7 @@ export function createApp() {
 
   app.use("/api/stories", storiesRouter);
   app.use("/api/lyrics", lyricsRouter);
+  app.use("/api/conversations", conversationsRouter);
   app.use("/api/lookup", lookupRouter);
   app.use("/api/analyze", analyzeRouter);
   app.use("/api/admin", adminRouter);

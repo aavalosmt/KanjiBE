@@ -38,6 +38,8 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/conversations?page=1&limit=20&topic=convenience_store&level=N4`
 - `GET /api/conversations/:id` — bloques `type: "dialogue"` con `speaker` por turno
 - `GET /api/topics` — lista de temas registrados (`{ id, slug, label }`), para poblar filtros. El `topic` de una conversación debe ser un `slug` ya registrado aquí.
+- `GET /api/manga?page=1&limit=20` — tomos (sin `pages`)
+- `GET /api/manga/:id` — tomo completo con `pages[].dialogues[]` (OCR + morfología ya resuelta por el cliente desktop, ver [`docs/manga-ingest.md`](docs/manga-ingest.md))
 - Admin: `GET /api/admin/lrclib/search?q=` y `POST /api/admin/lrclib/import` `{ id }` — busca, sincroniza, tokeniza y guarda
 - `GET /health`
 - `GET /api/lookup?q=知らない` — lematiza (知る) y describe el verbo en inglés (`godan verb 知る in the negative form`). También `GET /api/lookup/知らない`.
@@ -60,6 +62,12 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
 - `DELETE /api/admin/conversations/:id`
 - `POST /api/admin/topics` `{ slug, label }` — `slug` en snake_case; 409 si ya existe
 - `POST /api/admin/upload` — `multipart/form-data` con campo `file` o `image`
+- Manga (contrato completo en [`docs/manga-ingest.md`](docs/manga-ingest.md)):
+  - `POST /api/admin/manga/upload-image` — `multipart/form-data`, campos `image` + `image_checksum` (sha256), dedup por checksum
+  - `POST /api/admin/manga/ingest` — upsert de un tomo + sus páginas/diálogos, idempotente por `volume_id`
+  - `GET /api/admin/manga`, `GET /api/admin/manga/:id/pages/:pageIndex`
+  - `PATCH /api/admin/manga/:id/pages/:pageIndex/dialogues/:dialogueIndex`
+  - `PUT /api/admin/manga/:id/pages/:pageIndex/image`, `DELETE /api/admin/manga/:id/pages/:pageIndex`
 
 ## Hosting (Railway)
 

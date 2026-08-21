@@ -229,3 +229,68 @@ export function parseBlocks(value: unknown): ContentBlock[] {
   }
   return normalizeBlocks(parsed.data);
 }
+
+// --- Manga ingest (desktop OCR client contract) ---
+// Field names stay snake_case end-to-end for this sub-API: it is a fixed
+// external contract shared with the desktop OCR client, not the rest of
+// KanjiBE's camelCase JSON.
+
+export const SUPPORTED_MANGA_SCHEMA_VERSIONS = ["1.0"] as const;
+
+export const mangaBoxSchema = z.object({
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive()
+});
+
+export const mangaMorphologyItemSchema = z.object({
+  surface: z.string(),
+  pos: z.string()
+});
+
+export const mangaDialogueIngestSchema = z.object({
+  dialogue_box: mangaBoxSchema,
+  full_text: z.string().trim().min(1),
+  tokens: z.array(z.string()).default([]),
+  furigana: z.string().default(""),
+  morphology: z.array(mangaMorphologyItemSchema).default([])
+});
+
+export const mangaPageIngestSchema = z.object({
+  page_index: z.number().int().nonnegative(),
+  image_url: z.string().trim().min(1),
+  image_checksum: z.string().trim().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  dialogues: z.array(mangaDialogueIngestSchema).default([])
+});
+
+export const mangaIngestSchema = z.object({
+  schema_version: z
+    .string()
+    .refine((value) => (SUPPORTED_MANGA_SCHEMA_VERSIONS as readonly string[]).includes(value), {
+      message: `Unsupported schema_version. Supported: ${SUPPORTED_MANGA_SCHEMA_VERSIONS.join(", ")}`
+    }),
+  volume_id: z.string().uuid(),
+  title: z.string().trim().min(1),
+  volume_number: z.string().trim().min(1).optional(),
+  total_pages: z.number().int().positive().optional(),
+  pages: z.array(mangaPageIngestSchema).min(1)
+});
+
+export const mangaDialoguePatchSchema = z
+  .object({
+    dialogue_box: mangaBoxSchema.optional(),
+    full_text: z.string().trim().min(1).optional(),
+    tokens: z.array(z.string()).optional(),
+    furigana: z.string().optional(),
+    morphology: z.array(mangaMorphologyItemSchema).optional()
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required"
+  });
+
+export function stripChecksumPrefix(value: string): string {
+  return value.trim().toLowerCase().replace(/^sha256:/, "");
+}

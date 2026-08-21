@@ -84,3 +84,47 @@ export type Paginated<T> = {
     total: number;
   };
 };
+
+export type MangaBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type MangaMorphologyItem = {
+  surface: string;
+  pos: string;
+};
+
+export type MangaDialogue = {
+  dialogue_index: number;
+  dialogue_box: MangaBox;
+  full_text: string;
+  tokens: string[];
+  furigana: string;
+  morphology: MangaMorphologyItem[];
+};
+
+export type MangaPage = {
+  page_index: number;
+  image_url: string;
+  image_checksum: string;
+  width: number;
+  height: number;
+  dialogues: MangaDialogue[];
+};
+
+export type MangaVolumeSummary = {
+  id: string;
+  title: string;
+  volume_number: string | null;
+  total_pages: number | null;
+  page_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MangaVolume = MangaVolumeSummary & {
+  pages: MangaPage[];
+};

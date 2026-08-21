@@ -49,3 +49,51 @@ model Topic {
   label     String
   createdAt DateTime @default(now())
 }
+
+model MangaVolume {
+  id           String      @id
+  title        String
+  volumeNumber String?
+  totalPages   Int?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  pages        MangaPage[]
+}
+
+model MangaPage {
+  id            String          @id @default(uuid())
+  volumeId      String
+  volume        MangaVolume     @relation(fields: [volumeId], references: [id], onDelete: Cascade)
+  pageIndex     Int
+  imageUrl      String
+  imageChecksum String
+  width         Int
+  height        Int
+  updatedAt     DateTime        @updatedAt
+  dialogues     MangaDialogue[]
+
+  @@unique([volumeId, pageIndex])
+}
+
+model MangaDialogue {
+  id            String    @id @default(uuid())
+  pageId        String
+  page          MangaPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  dialogueIndex Int
+  boxX          Int
+  boxY          Int
+  boxWidth      Int
+  boxHeight     Int
+  fullText      String
+  tokens        String
+  furigana      String
+  morphology    String
+
+  @@unique([pageId, dialogueIndex])
+}
+
+model MangaImageAsset {
+  checksum  String   @id
+  url       String
+  createdAt DateTime @default(now())
+}

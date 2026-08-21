@@ -11,6 +11,8 @@ import { analyzeRouter } from "./routes/analyze.js";
 import { conversationsRouter } from "./routes/conversations.js";
 import { lookupRouter } from "./routes/lookup.js";
 import { lyricsRouter } from "./routes/lyrics.js";
+import { mangaRouter } from "./routes/manga.js";
+import { mangaAdminRouter } from "./routes/mangaAdmin.js";
 import { storiesRouter } from "./routes/stories.js";
 import { topicsRouter } from "./routes/topics.js";
 import { uploadRouter } from "./routes/upload.js";
@@ -70,8 +72,10 @@ export function createApp() {
   app.use("/api/topics", topicsRouter);
   app.use("/api/lookup", lookupRouter);
   app.use("/api/analyze", analyzeRouter);
+  app.use("/api/manga", mangaRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/admin", uploadRouter);
+  app.use("/api/admin/manga", mangaAdminRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -30,3 +30,9 @@ if (!config.adminApiKey && config.nodeEnv === "production") {
     "ADMIN_API_KEY is not set. The API will start, but /admin writes will return 401."
   );
 }
+
+if (!process.env.PUBLIC_BASE_URL && config.nodeEnv === "production") {
+  console.warn(
+    `PUBLIC_BASE_URL is not set. Uploaded file URLs will be stored as ${config.publicBaseUrl}/uploads/... and will be broken for clients.`
+  );
+}

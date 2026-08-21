@@ -42,6 +42,7 @@ Las `image_url` referenciadas deben venir de la Sección 2 — este endpoint no 
   "title": "MyDressUpDarling",
   "volume_number": "1",
   "total_pages": 180,
+  "cover_url": "https://.../vol1_cover.webp",
   "pages": [
     {
       "page_index": 0,
@@ -68,11 +69,13 @@ Las `image_url` referenciadas deben venir de la Sección 2 — este endpoint no 
 
 `volume_id` es generado por el cliente y es la clave de upsert — el servidor nunca genera uno nuevo. `tokens`, `furigana` y `morphology` se persisten tal cual llegan; el backend no los transforma, enriquece ni re-tokeniza (eso ya lo resolvió el cliente desktop; la definición por palabra la resuelve la app de iOS contra su diccionario local).
 
+`cover_url` es opcional — una imagen de portada del tomo, distinta de `pages[].image_url` (por ejemplo la carátula oficial en vez de la página 1). Si no se manda, queda `null`. Se puede setear o cambiar después con `PATCH /api/admin/manga/:id` (ver Sección 5) sin volver a mandar páginas.
+
 ### Idempotencia
 
 Reintentar la misma petición nunca duplica datos:
 
-- **Tomo:** upsert por `volume_id`.
+- **Tomo:** upsert por `volume_id`. Cada ingest sobreescribe `title`/`volume_number`/`total_pages`/`cover_url` por completo — omitir uno de estos campos en un reintento posterior lo deja en `null`, no lo preserva.
 - **Página:** upsert por `(volume_id, page_index)`. Reemplaza sus diálogos completos en cada ingest (no hace merge parcial de diálogos dentro de una página).
 
 ### Versionado
@@ -100,12 +103,13 @@ Bajo `/api/admin/manga`, misma auth que la Sección 1:
 |---|---|---|
 | `GET` | `/api/admin/manga` | Listar tomos |
 | `GET` | `/api/admin/manga/:id` | Detalle de tomo + páginas |
+| `PATCH` | `/api/admin/manga/:id` | Editar metadata del tomo (`title`, `volume_number`, `cover_url`) |
 | `GET` | `/api/admin/manga/:id/pages/:pageIndex` | Detalle de página + diálogos |
 | `PATCH` | `/api/admin/manga/:id/pages/:pageIndex/dialogues/:dialogueIndex` | Editar campos de un diálogo |
 | `PUT` | `/api/admin/manga/:id/pages/:pageIndex/image` | Reemplazar imagen de la página (`multipart`, campo `image`) |
 | `DELETE` | `/api/admin/manga/:id/pages/:pageIndex` | Borrar página (cascada a sus diálogos) |
 
-No hay UI todavía en `/admin` para esto — solo la API. Borrar tomos completos no está cubierto (extensión natural si hace falta).
+UI en `/admin` → pestaña **Manga**: lista de tomos, grilla de páginas, y un editor por página con overlay de cajas delimitadoras sobre la imagen (click para seleccionar, arrastrar para reposicionar) junto a los campos de cada diálogo. Borrar tomos completos no está cubierto (extensión natural si hace falta).
 
 ## 6. Qué queda fuera a propósito (MVP)
 

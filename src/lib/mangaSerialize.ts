@@ -44,6 +44,7 @@ export function toMangaVolumeSummary(
     title: row.title,
     volume_number: row.volumeNumber,
     total_pages: row.totalPages,
+    cover_url: row.coverUrl,
     page_count: row._count.pages,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString()
@@ -58,6 +59,7 @@ export function toMangaVolume(
     title: row.title,
     volume_number: row.volumeNumber,
     total_pages: row.totalPages,
+    cover_url: row.coverUrl,
     page_count: row.pages.length,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),

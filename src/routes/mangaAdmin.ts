@@ -9,6 +9,7 @@ import { requireAdmin } from "../middleware/adminAuth.js";
 import {
   mangaDialoguePatchSchema,
   mangaIngestSchema,
+  mangaVolumePatchSchema,
   stripChecksumPrefix
 } from "../validators.js";
 
@@ -58,12 +59,14 @@ mangaAdminRouter.post("/ingest", async (req, res) => {
         id: payload.volume_id,
         title: payload.title,
         volumeNumber: payload.volume_number ?? null,
-        totalPages: payload.total_pages ?? null
+        totalPages: payload.total_pages ?? null,
+        coverUrl: payload.cover_url ?? null
       },
       update: {
         title: payload.title,
         volumeNumber: payload.volume_number ?? null,
-        totalPages: payload.total_pages ?? null
+        totalPages: payload.total_pages ?? null,
+        coverUrl: payload.cover_url ?? null
       }
     });
 
@@ -157,6 +160,34 @@ mangaAdminRouter.get("/:id", async (req, res) => {
   }
 
   res.json(toMangaVolume(volume));
+});
+
+mangaAdminRouter.patch("/:id", async (req, res) => {
+  const payload = mangaVolumePatchSchema.parse(req.body);
+
+  try {
+    const volume = await prisma.mangaVolume.update({
+      where: { id: req.params.id },
+      data: {
+        title: payload.title,
+        volumeNumber: payload.volume_number,
+        coverUrl: payload.cover_url
+      },
+      include: {
+        pages: {
+          orderBy: { pageIndex: "asc" },
+          include: { dialogues: { orderBy: { dialogueIndex: "asc" } } }
+        }
+      }
+    });
+    res.json(toMangaVolume(volume));
+  } catch (error) {
+    if (isNotFound(error)) {
+      res.status(404).json({ error: "Manga volume not found" });
+      return;
+    }
+    throw error;
+  }
 });
 
 async function findPage(volumeId: string, pageIndex: number) {

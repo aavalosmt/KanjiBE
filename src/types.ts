@@ -120,6 +120,7 @@ export type MangaVolumeSummary = {
   title: string;
   volume_number: string | null;
   total_pages: number | null;
+  cover_url: string | null;
   page_count: number;
   created_at: string;
   updated_at: string;

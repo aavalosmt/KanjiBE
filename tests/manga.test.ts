@@ -21,6 +21,7 @@ function ingestPayload(overrides: Partial<Record<string, unknown>> = {}) {
     title: "My Dress-Up Darling",
     volume_number: "1",
     total_pages: 1,
+    cover_url: "http://localhost:3000/uploads/cover.png",
     pages: [
       {
         page_index: 0,
@@ -90,6 +91,20 @@ describe("admin manga ingest", () => {
     expect(volume?.pages).toHaveLength(1);
     expect(volume?.pages[0].dialogues).toHaveLength(1);
     expect(volume?.pages[0].imageChecksum).toBe(PNG_CHECKSUM);
+    expect(volume?.coverUrl).toBe("http://localhost:3000/uploads/cover.png");
+  });
+
+  it("clears cover_url when a later ingest omits it", async () => {
+    await request(app).post("/api/admin/manga/ingest").set(admin).send(ingestPayload());
+    await request(app)
+      .post("/api/admin/manga/ingest")
+      .set(admin)
+      .send(ingestPayload({ cover_url: undefined }));
+
+    const volume = await prisma.mangaVolume.findUnique({
+      where: { id: "b3a1e6f0-2c3d-4a9e-9f7a-1d2e3f4a5b6c" }
+    });
+    expect(volume?.coverUrl).toBeNull();
   });
 
   it("is idempotent: re-ingesting the same payload does not duplicate pages or dialogues", async () => {
@@ -162,7 +177,8 @@ describe("public manga read API", () => {
     expect(res.body.data[0]).toMatchObject({
       id: "b3a1e6f0-2c3d-4a9e-9f7a-1d2e3f4a5b6c",
       title: "My Dress-Up Darling",
-      page_count: 1
+      page_count: 1,
+      cover_url: "http://localhost:3000/uploads/cover.png"
     });
     expect(res.body.data[0].pages).toBeUndefined();
   });
@@ -170,6 +186,7 @@ describe("public manga read API", () => {
   it("returns full page and dialogue detail", async () => {
     const res = await request(app).get("/api/manga/b3a1e6f0-2c3d-4a9e-9f7a-1d2e3f4a5b6c");
     expect(res.status).toBe(200);
+    expect(res.body.cover_url).toBe("http://localhost:3000/uploads/cover.png");
     expect(res.body.pages).toHaveLength(1);
     expect(res.body.pages[0].dialogues[0]).toMatchObject({
       dialogue_index: 0,
@@ -217,5 +234,50 @@ describe("admin manga page/dialogue editing", () => {
     expect(res.status).toBe(204);
     expect(await prisma.mangaPage.count()).toBe(0);
     expect(await prisma.mangaDialogue.count()).toBe(0);
+  });
+});
+
+describe("admin manga volume metadata", () => {
+  beforeEach(async () => {
+    await request(app).post("/api/admin/manga/ingest").set(admin).send(ingestPayload());
+  });
+
+  it("patches cover_url without touching pages", async () => {
+    const res = await request(app)
+      .patch("/api/admin/manga/b3a1e6f0-2c3d-4a9e-9f7a-1d2e3f4a5b6c")
+      .set(admin)
+      .send({ cover_url: "http://localhost:3000/uploads/new-cover.png" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.cover_url).toBe("http://localhost:3000/uploads/new-cover.png");
+    expect(res.body.pages).toHaveLength(1);
+  });
+
+  it("clears cover_url when explicitly set to null", async () => {
+    const res = await request(app)
+      .patch("/api/admin/manga/b3a1e6f0-2c3d-4a9e-9f7a-1d2e3f4a5b6c")
+      .set(admin)
+      .send({ cover_url: null });
+
+    expect(res.status).toBe(200);
+    expect(res.body.cover_url).toBeNull();
+  });
+
+  it("rejects an empty patch body", async () => {
+    const res = await request(app)
+      .patch("/api/admin/manga/b3a1e6f0-2c3d-4a9e-9f7a-1d2e3f4a5b6c")
+      .set(admin)
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+
+  it("404s patching an unknown volume", async () => {
+    const res = await request(app)
+      .patch("/api/admin/manga/does-not-exist")
+      .set(admin)
+      .send({ cover_url: "http://localhost:3000/uploads/x.png" });
+
+    expect(res.status).toBe(404);
   });
 });

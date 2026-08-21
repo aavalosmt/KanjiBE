@@ -55,6 +55,7 @@ model MangaVolume {
   title        String
   volumeNumber String?
   totalPages   Int?
+  coverUrl     String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   pages        MangaPage[]

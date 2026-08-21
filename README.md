@@ -65,7 +65,7 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
 - Manga (contrato completo en [`docs/manga-ingest.md`](docs/manga-ingest.md)):
   - `POST /api/admin/manga/upload-image` — `multipart/form-data`, campos `image` + `image_checksum` (sha256), dedup por checksum
   - `POST /api/admin/manga/ingest` — upsert de un tomo + sus páginas/diálogos, idempotente por `volume_id`
-  - `GET /api/admin/manga`, `GET /api/admin/manga/:id/pages/:pageIndex`
+  - `GET /api/admin/manga`, `PATCH /api/admin/manga/:id` (title/volume_number/cover_url), `GET /api/admin/manga/:id/pages/:pageIndex`
   - `PATCH /api/admin/manga/:id/pages/:pageIndex/dialogues/:dialogueIndex`
   - `PUT /api/admin/manga/:id/pages/:pageIndex/image`, `DELETE /api/admin/manga/:id/pages/:pageIndex`
 

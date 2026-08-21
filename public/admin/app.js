@@ -1629,6 +1629,7 @@ function renderMangaList(items) {
         .map(
           (item) => `
         <article class="card item">
+          ${coverMarkup(item.cover_url)}
           <div class="item-body">
             <div class="kicker">${item.page_count} página${item.page_count === 1 ? "" : "s"}</div>
             <h2>${escapeHtml(item.title)}${item.volume_number ? ` · Vol. ${escapeHtml(item.volume_number)}` : ""}</h2>

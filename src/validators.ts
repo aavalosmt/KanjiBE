@@ -276,8 +276,19 @@ export const mangaIngestSchema = z.object({
   title: z.string().trim().min(1),
   volume_number: z.string().trim().min(1).optional(),
   total_pages: z.number().int().positive().optional(),
+  cover_url: z.string().trim().min(1).optional(),
   pages: z.array(mangaPageIngestSchema).min(1)
 });
+
+export const mangaVolumePatchSchema = z
+  .object({
+    title: z.string().trim().min(1).optional(),
+    volume_number: z.string().trim().min(1).nullable().optional(),
+    cover_url: z.string().trim().min(1).nullable().optional()
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required"
+  });
 
 export const mangaDialoguePatchSchema = z
   .object({

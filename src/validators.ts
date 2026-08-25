@@ -305,3 +305,74 @@ export const mangaDialoguePatchSchema = z
 export function stripChecksumPrefix(value: string): string {
   return value.trim().toLowerCase().replace(/^sha256:/, "");
 }
+
+// --- Vocabulary ingest (mirrors the manga contract above: pages of an
+// image with positioned text boxes, but for vocabulary entries rather
+// than dialogue) ---
+
+export const SUPPORTED_VOCABULARY_SCHEMA_VERSIONS = ["1.0"] as const;
+
+export const vocabularyBoxSchema = z.object({
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive()
+});
+
+export const vocabularyMorphologyItemSchema = z.object({
+  surface: z.string(),
+  pos: z.string()
+});
+
+export const vocabularyEntryIngestSchema = z.object({
+  entry_box: vocabularyBoxSchema,
+  full_text: z.string().trim().min(1),
+  tokens: z.array(z.string()).default([]),
+  furigana: z.string().default(""),
+  morphology: z.array(vocabularyMorphologyItemSchema).default([])
+});
+
+export const vocabularyPageIngestSchema = z.object({
+  page_index: z.number().int().nonnegative(),
+  image_url: z.string().trim().min(1),
+  image_checksum: z.string().trim().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  entries: z.array(vocabularyEntryIngestSchema).default([])
+});
+
+export const vocabularyIngestSchema = z.object({
+  schema_version: z
+    .string()
+    .refine((value) => (SUPPORTED_VOCABULARY_SCHEMA_VERSIONS as readonly string[]).includes(value), {
+      message: `Unsupported schema_version. Supported: ${SUPPORTED_VOCABULARY_SCHEMA_VERSIONS.join(", ")}`
+    }),
+  set_id: z.string().uuid(),
+  title: z.string().trim().min(1),
+  set_number: z.string().trim().min(1).optional(),
+  total_pages: z.number().int().positive().optional(),
+  cover_url: z.string().trim().min(1).optional(),
+  pages: z.array(vocabularyPageIngestSchema).min(1)
+});
+
+export const vocabularySetPatchSchema = z
+  .object({
+    title: z.string().trim().min(1).optional(),
+    set_number: z.string().trim().min(1).nullable().optional(),
+    cover_url: z.string().trim().min(1).nullable().optional()
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required"
+  });
+
+export const vocabularyEntryPatchSchema = z
+  .object({
+    entry_box: vocabularyBoxSchema.optional(),
+    full_text: z.string().trim().min(1).optional(),
+    tokens: z.array(z.string()).optional(),
+    furigana: z.string().optional(),
+    morphology: z.array(vocabularyMorphologyItemSchema).optional()
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required"
+  });

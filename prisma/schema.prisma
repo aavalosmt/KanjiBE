@@ -98,3 +98,52 @@ model MangaImageAsset {
   url       String
   createdAt DateTime @default(now())
 }
+
+model VocabularySet {
+  id         String           @id
+  title      String
+  setNumber  String?
+  totalPages Int?
+  coverUrl   String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  pages      VocabularyPage[]
+}
+
+model VocabularyPage {
+  id            String            @id @default(uuid())
+  setId         String
+  set           VocabularySet     @relation(fields: [setId], references: [id], onDelete: Cascade)
+  pageIndex     Int
+  imageUrl      String
+  imageChecksum String
+  width         Int
+  height        Int
+  updatedAt     DateTime          @updatedAt
+  entries       VocabularyEntry[]
+
+  @@unique([setId, pageIndex])
+}
+
+model VocabularyEntry {
+  id         String         @id @default(uuid())
+  pageId     String
+  page       VocabularyPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  entryIndex Int
+  boxX       Int
+  boxY       Int
+  boxWidth   Int
+  boxHeight  Int
+  fullText   String
+  tokens     String
+  furigana   String
+  morphology String
+
+  @@unique([pageId, entryIndex])
+}
+
+model VocabularyImageAsset {
+  checksum  String   @id
+  url       String
+  createdAt DateTime @default(now())
+}

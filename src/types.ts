@@ -129,3 +129,48 @@ export type MangaVolumeSummary = {
 export type MangaVolume = MangaVolumeSummary & {
   pages: MangaPage[];
 };
+
+export type VocabularyBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type VocabularyMorphologyItem = {
+  surface: string;
+  pos: string;
+};
+
+export type VocabularyEntry = {
+  entry_index: number;
+  entry_box: VocabularyBox;
+  full_text: string;
+  tokens: string[];
+  furigana: string;
+  morphology: VocabularyMorphologyItem[];
+};
+
+export type VocabularyPage = {
+  page_index: number;
+  image_url: string;
+  image_checksum: string;
+  width: number;
+  height: number;
+  entries: VocabularyEntry[];
+};
+
+export type VocabularySetSummary = {
+  id: string;
+  title: string;
+  set_number: string | null;
+  total_pages: number | null;
+  cover_url: string | null;
+  page_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VocabularySet = VocabularySetSummary & {
+  pages: VocabularyPage[];
+};

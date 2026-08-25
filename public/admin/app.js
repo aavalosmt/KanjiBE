@@ -278,6 +278,7 @@ function layout(active, body) {
         <a href="#/lyrics" class="${active === "lyrics" ? "active" : ""}">Letras</a>
         <a href="#/conversations" class="${active === "conversations" ? "active" : ""}">Conversaciones</a>
         <a href="#/manga" class="${active === "manga" ? "active" : ""}">Manga</a>
+        <a href="#/vocabulary" class="${active === "vocabulary" ? "active" : ""}">Vocabulario</a>
         <a href="#/search" class="${active === "search" ? "active" : ""}">Buscar</a>
         <a href="#/import" class="${active === "import" ? "active" : ""}">Importar</a>
         <button class="ghost" id="logout" type="button">Salir</button>
@@ -1960,6 +1961,323 @@ function bindMangaPageEditor(volume, page, pageIndex) {
   });
 }
 
+function renderVocabularyList(items) {
+  const cards = items.length
+    ? items
+        .map(
+          (item) => `
+        <article class="card item">
+          ${coverMarkup(item.cover_url)}
+          <div class="item-body">
+            <div class="kicker">${item.page_count} página${item.page_count === 1 ? "" : "s"}</div>
+            <h2>${escapeHtml(item.title)}${item.set_number ? ` · N.º ${escapeHtml(item.set_number)}` : ""}</h2>
+            <p class="muted">Actualizado ${new Date(item.updated_at).toLocaleString()}</p>
+            <div class="actions">
+              <a class="primary" href="#/vocabulary/${encodeURIComponent(item.id)}">Ver páginas</a>
+            </div>
+          </div>
+        </article>`
+        )
+        .join("")
+    : `<div class="empty"><h2>No hay listas de vocabulario todavía</h2><p class="muted">Se cargan desde el cliente desktop OCR vía <code>POST /api/admin/vocabulary/ingest</code>. Ver <code>docs/vocabulary-ingest.md</code>.</p></div>`;
+
+  app.innerHTML = layout(
+    "vocabulary",
+    `
+      <div class="row">
+        <div>
+          <div class="kicker">Contenido</div>
+          <h1>Vocabulario</h1>
+        </div>
+      </div>
+      <div class="grid">${cards}</div>
+    `
+  );
+  bindLogout();
+}
+
+function vocabularyPageThumb(set, page) {
+  const count = page.entries.length;
+  return `
+    <article class="card item">
+      <a href="#/vocabulary/${encodeURIComponent(set.id)}/pages/${page.page_index}">
+        <img class="cover" src="${escapeHtml(page.image_url)}" alt="Página ${page.page_index}" loading="lazy" />
+      </a>
+      <div class="item-body">
+        <div class="kicker">Página ${page.page_index}</div>
+        <p class="muted">${count} entrada${count === 1 ? "" : "s"}</p>
+        <div class="actions">
+          <a class="ghost tiny" href="#/vocabulary/${encodeURIComponent(set.id)}/pages/${page.page_index}">Editar</a>
+          <button class="danger tiny" data-del-page="${page.page_index}" type="button">Borrar</button>
+        </div>
+      </div>
+    </article>`;
+}
+
+function renderVocabularySet(set) {
+  const pages = [...set.pages].sort((a, b) => a.page_index - b.page_index);
+  const cards = pages.length
+    ? pages.map((page) => vocabularyPageThumb(set, page)).join("")
+    : `<div class="empty"><h2>Esta lista no tiene páginas</h2></div>`;
+
+  app.innerHTML = layout(
+    "vocabulary",
+    `
+      <div class="row">
+        <div>
+          <div class="kicker"><a href="#/vocabulary">Vocabulario</a></div>
+          <h1>${escapeHtml(set.title)}${set.set_number ? ` · N.º ${escapeHtml(set.set_number)}` : ""}</h1>
+          <p class="muted">${pages.length} página${pages.length === 1 ? "" : "s"}</p>
+        </div>
+      </div>
+      <div class="grid">${cards}</div>
+    `
+  );
+  bindLogout();
+
+  app.querySelectorAll("[data-del-page]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!confirm("¿Borrar esta página y sus entradas?")) return;
+      try {
+        await api(
+          `/api/admin/vocabulary/${encodeURIComponent(set.id)}/pages/${button.dataset.delPage}`,
+          { method: "DELETE" }
+        );
+        toast("Página borrada", "ok");
+        await route();
+      } catch (error) {
+        toast(error.message, "error");
+      }
+    });
+  });
+}
+
+function vocabularyEntryCard(entry, index) {
+  const tokensValue = entry.tokens.join(", ");
+  const morphologyValue = entry.morphology.map((item) => `${item.surface} = ${item.pos}`).join("\n");
+  return `
+    <form class="block vocabulary-entry" data-entry-index="${index}">
+      <div class="block-head">
+        <b>Entrada ${index + 1}</b>
+      </div>
+      <label class="field">
+        <span>Texto (OCR)</span>
+        <textarea class="jp" data-field="full_text" rows="2">${escapeHtml(entry.full_text)}</textarea>
+      </label>
+      <label class="field">
+        <span>Furigana</span>
+        <textarea class="jp" data-field="furigana" rows="2">${escapeHtml(entry.furigana)}</textarea>
+      </label>
+      <div class="manga-furigana-preview" data-preview></div>
+      <label class="field">
+        <span>Tokens (separados por coma)</span>
+        <input data-field="tokens" value="${escapeHtml(tokensValue)}" />
+      </label>
+      <label class="field">
+        <span>Morfología (una por línea: superficie = categoría)</span>
+        <textarea data-field="morphology" rows="3">${escapeHtml(morphologyValue)}</textarea>
+      </label>
+      <div class="meta-grid manga-box-fields">
+        <label class="field"><span>x</span><input type="number" data-field="x" value="${entry.entry_box.x}" /></label>
+        <label class="field"><span>y</span><input type="number" data-field="y" value="${entry.entry_box.y}" /></label>
+        <label class="field"><span>ancho</span><input type="number" data-field="width" value="${entry.entry_box.width}" /></label>
+        <label class="field"><span>alto</span><input type="number" data-field="height" value="${entry.entry_box.height}" /></label>
+      </div>
+      <div class="actions">
+        <button class="primary" type="submit">Guardar</button>
+      </div>
+    </form>`;
+}
+
+function renderVocabularyPageEditor(set, page, pageIndex) {
+  const pages = [...set.pages].sort((a, b) => a.page_index - b.page_index);
+  const currentPos = pages.findIndex((item) => item.page_index === pageIndex);
+  const prevPage = currentPos > 0 ? pages[currentPos - 1] : null;
+  const nextPage = currentPos >= 0 && currentPos < pages.length - 1 ? pages[currentPos + 1] : null;
+  const entries = [...page.entries].sort((a, b) => a.entry_index - b.entry_index);
+
+  // Positioned via SVG geometry attributes (x/y/width/height on <rect>/<text>),
+  // not CSS — the app's CSP (style-src 'self', no unsafe-inline) silently
+  // drops inline "style" attributes and JS .style.* writes, which would make
+  // percentage-positioned <div> overlays invisible/misplaced.
+  const boxes = entries
+    .map((entry, index) => {
+      const box = entry.entry_box;
+      return `
+        <rect class="manga-box" data-entry-index="${index}" x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}"></rect>
+        <text class="manga-box-num" data-entry-index="${index}" x="${box.x}" y="${Math.max(0, box.y - 6)}">${index + 1}</text>`;
+    })
+    .join("");
+
+  const entryCards = entries.length
+    ? entries.map((entry, index) => vocabularyEntryCard(entry, index)).join("")
+    : `<p class="muted">Esta página no tiene entradas.</p>`;
+
+  app.innerHTML = layout(
+    "vocabulary",
+    `
+      <div class="row">
+        <div>
+          <div class="kicker"><a href="#/vocabulary">Vocabulario</a> · <a href="#/vocabulary/${encodeURIComponent(set.id)}">${escapeHtml(set.title)}</a></div>
+          <h1>Página ${pageIndex}</h1>
+        </div>
+        <div class="actions">
+          ${prevPage ? `<a class="ghost" href="#/vocabulary/${encodeURIComponent(set.id)}/pages/${prevPage.page_index}">← Anterior</a>` : ""}
+          ${nextPage ? `<a class="ghost" href="#/vocabulary/${encodeURIComponent(set.id)}/pages/${nextPage.page_index}">Siguiente →</a>` : ""}
+        </div>
+      </div>
+      <div class="editor-grid">
+        <section class="editor pad">
+          <div class="manga-image-wrap" id="vocabulary-image-wrap">
+            <img id="vocabulary-page-image" src="${escapeHtml(page.image_url)}" alt="" />
+            <svg id="vocabulary-box-layer" class="manga-box-layer" viewBox="0 0 ${page.width} ${page.height}" preserveAspectRatio="none">
+              ${boxes}
+            </svg>
+          </div>
+          <div class="upload-row manga-upload-row">
+            <label class="ghost file-label">
+              Reemplazar imagen…
+              <input id="vocabulary-replace-image" class="hidden-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+            </label>
+            <button class="danger" id="vocabulary-delete-page" type="button">Borrar página</button>
+          </div>
+        </section>
+        <aside class="manga-dialogues">${entryCards}</aside>
+      </div>
+    `
+  );
+  bindLogout();
+  bindVocabularyPageEditor(set, page, pageIndex);
+}
+
+function bindVocabularyPageEditor(set, page, pageIndex) {
+  const svg = document.querySelector("#vocabulary-box-layer");
+  const forms = [...document.querySelectorAll(".vocabulary-entry")];
+
+  forms.forEach((form) => {
+    const preview = form.querySelector("[data-preview]");
+    const furiganaField = form.querySelector('[data-field="furigana"]');
+    const updatePreview = () => {
+      preview.replaceChildren(renderFurigana(furiganaField.value));
+    };
+    updatePreview();
+    furiganaField.addEventListener("input", updatePreview);
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const index = Number(form.dataset.entryIndex);
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      const body = {
+        full_text: form.querySelector('[data-field="full_text"]').value.trim(),
+        furigana: furiganaField.value,
+        tokens: parseTokensInput(form.querySelector('[data-field="tokens"]').value),
+        morphology: parseMorphologyInput(form.querySelector('[data-field="morphology"]').value),
+        entry_box: {
+          x: Number(form.querySelector('[data-field="x"]').value),
+          y: Number(form.querySelector('[data-field="y"]').value),
+          width: Number(form.querySelector('[data-field="width"]').value),
+          height: Number(form.querySelector('[data-field="height"]').value)
+        }
+      };
+      try {
+        await api(
+          `/api/admin/vocabulary/${encodeURIComponent(set.id)}/pages/${pageIndex}/entries/${index}`,
+          { method: "PATCH", body: JSON.stringify(body) }
+        );
+        toast("Entrada guardada", "ok");
+        await route();
+      } catch (error) {
+        toast(error.message, "error");
+        button.disabled = false;
+      }
+    });
+  });
+
+  svg.querySelectorAll(".manga-box").forEach((box) => {
+    const index = Number(box.dataset.entryIndex);
+    const label = svg.querySelector(`.manga-box-num[data-entry-index="${index}"]`);
+
+    box.addEventListener("click", () => {
+      if (box.dataset.dragged === "1") {
+        box.dataset.dragged = "0";
+        return;
+      }
+      svg.querySelectorAll(".manga-box").forEach((item) => item.classList.remove("selected"));
+      box.classList.add("selected");
+      const target = forms[index];
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.classList.add("flash");
+      window.setTimeout(() => target?.classList.remove("flash"), 900);
+    });
+
+    box.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      box.setPointerCapture(event.pointerId);
+      const form = forms[index];
+      const xField = form.querySelector('[data-field="x"]');
+      const yField = form.querySelector('[data-field="y"]');
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const originX = Number(xField.value);
+      const originY = Number(yField.value);
+      const svgRect = svg.getBoundingClientRect();
+      const scaleX = page.width / svgRect.width;
+      const scaleY = page.height / svgRect.height;
+
+      const onMove = (moveEvent) => {
+        box.dataset.dragged = "1";
+        const dx = (moveEvent.clientX - startX) * scaleX;
+        const dy = (moveEvent.clientY - startY) * scaleY;
+        const nextX = Math.max(0, Math.round(originX + dx));
+        const nextY = Math.max(0, Math.round(originY + dy));
+        xField.value = String(nextX);
+        yField.value = String(nextY);
+        box.setAttribute("x", String(nextX));
+        box.setAttribute("y", String(nextY));
+        label?.setAttribute("x", String(nextX));
+        label?.setAttribute("y", String(Math.max(0, nextY - 6)));
+      };
+      const onUp = () => {
+        box.removeEventListener("pointermove", onMove);
+        box.removeEventListener("pointerup", onUp);
+      };
+      box.addEventListener("pointermove", onMove);
+      box.addEventListener("pointerup", onUp);
+    });
+  });
+
+  document.querySelector("#vocabulary-replace-image")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const body = new FormData();
+    body.append("image", file);
+    try {
+      await api(`/api/admin/vocabulary/${encodeURIComponent(set.id)}/pages/${pageIndex}/image`, {
+        method: "PUT",
+        body
+      });
+      toast("Imagen reemplazada", "ok");
+      await route();
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
+
+  document.querySelector("#vocabulary-delete-page")?.addEventListener("click", async () => {
+    if (!confirm("¿Borrar esta página y sus entradas?")) return;
+    try {
+      await api(`/api/admin/vocabulary/${encodeURIComponent(set.id)}/pages/${pageIndex}`, {
+        method: "DELETE"
+      });
+      toast("Página borrada", "ok");
+      go(`/vocabulary/${set.id}`);
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
+}
+
 async function route() {
   const { section, id, rest } = parseRoute();
   if (section === "login") {
@@ -1986,6 +2304,25 @@ async function route() {
     if (section === "manga" && id) {
       const volume = await api(`/api/admin/manga/${encodeURIComponent(id)}`);
       renderMangaVolume(volume);
+      return;
+    }
+    if (section === "vocabulary" && !id) {
+      const list = await api("/api/admin/vocabulary?limit=100");
+      renderVocabularyList(list.data);
+      return;
+    }
+    if (section === "vocabulary" && id && rest[0] === "pages" && rest[1] !== undefined) {
+      const pageIndex = Number(rest[1]);
+      const [set, page] = await Promise.all([
+        api(`/api/admin/vocabulary/${encodeURIComponent(id)}`),
+        api(`/api/admin/vocabulary/${encodeURIComponent(id)}/pages/${pageIndex}`)
+      ]);
+      renderVocabularyPageEditor(set, page, pageIndex);
+      return;
+    }
+    if (section === "vocabulary" && id) {
+      const set = await api(`/api/admin/vocabulary/${encodeURIComponent(id)}`);
+      renderVocabularySet(set);
       return;
     }
     if (section === "stories" && !id) {

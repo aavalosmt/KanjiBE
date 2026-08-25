@@ -40,6 +40,8 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/topics` — lista de temas registrados (`{ id, slug, label }`), para poblar filtros. El `topic` de una conversación debe ser un `slug` ya registrado aquí.
 - `GET /api/manga?page=1&limit=20` — tomos (sin `pages`)
 - `GET /api/manga/:id` — tomo completo con `pages[].dialogues[]` (OCR + morfología ya resuelta por el cliente desktop, ver [`docs/manga-ingest.md`](docs/manga-ingest.md))
+- `GET /api/vocabulary?page=1&limit=20` — listas de vocabulario (sin `pages`)
+- `GET /api/vocabulary/:id` — lista completa con `pages[].entries[]` (mismo contrato que manga, ver [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md))
 - Admin: `GET /api/admin/lrclib/search?q=` y `POST /api/admin/lrclib/import` `{ id }` — busca, sincroniza, tokeniza y guarda
 - `GET /health`
 - `GET /api/lookup?q=知らない` — lematiza (知る) y describe el verbo en inglés (`godan verb 知る in the negative form`). También `GET /api/lookup/知らない`.
@@ -68,6 +70,12 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
   - `GET /api/admin/manga`, `PATCH /api/admin/manga/:id` (title/volume_number/cover_url), `GET /api/admin/manga/:id/pages/:pageIndex`
   - `PATCH /api/admin/manga/:id/pages/:pageIndex/dialogues/:dialogueIndex`
   - `PUT /api/admin/manga/:id/pages/:pageIndex/image`, `DELETE /api/admin/manga/:id/pages/:pageIndex`
+- Vocabulario (mismo contrato que manga, completo en [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md)):
+  - `POST /api/admin/vocabulary/upload-image` — `multipart/form-data`, campos `image` + `image_checksum` (sha256), dedup por checksum
+  - `POST /api/admin/vocabulary/ingest` — upsert de una lista + sus páginas/entradas, idempotente por `set_id`
+  - `GET /api/admin/vocabulary`, `PATCH /api/admin/vocabulary/:id` (title/set_number/cover_url), `GET /api/admin/vocabulary/:id/pages/:pageIndex`
+  - `PATCH /api/admin/vocabulary/:id/pages/:pageIndex/entries/:entryIndex`
+  - `PUT /api/admin/vocabulary/:id/pages/:pageIndex/image`, `DELETE /api/admin/vocabulary/:id/pages/:pageIndex`
 
 ## Hosting (Railway)
 

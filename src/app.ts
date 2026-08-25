@@ -16,6 +16,8 @@ import { mangaAdminRouter } from "./routes/mangaAdmin.js";
 import { storiesRouter } from "./routes/stories.js";
 import { topicsRouter } from "./routes/topics.js";
 import { uploadRouter } from "./routes/upload.js";
+import { vocabularyRouter } from "./routes/vocabulary.js";
+import { vocabularyAdminRouter } from "./routes/vocabularyAdmin.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const adminDir = path.join(rootDir, "public", "admin");
@@ -73,9 +75,11 @@ export function createApp() {
   app.use("/api/lookup", lookupRouter);
   app.use("/api/analyze", analyzeRouter);
   app.use("/api/manga", mangaRouter);
+  app.use("/api/vocabulary", vocabularyRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/admin", uploadRouter);
   app.use("/api/admin/manga", mangaAdminRouter);
+  app.use("/api/admin/vocabulary", vocabularyAdminRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

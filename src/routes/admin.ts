@@ -14,6 +14,7 @@ import {
   toLyric,
   toStory
 } from "../lib/serialize.js";
+import { unknownTopicMessage } from "../lib/taxonomy.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
   conversationCreateSchema,
@@ -25,6 +26,7 @@ import {
   parseBlocks,
   storyCreateSchema,
   storyUpdateSchema,
+  subtopicCreateSchema,
   topicCreateSchema
 } from "../validators.js";
 
@@ -514,11 +516,6 @@ adminRouter.delete("/conversations/:id", async (req, res) => {
   }
 });
 
-async function unknownTopicMessage(slug: string): Promise<string | null> {
-  const topic = await prisma.topic.findUnique({ where: { slug } });
-  return topic ? null : `Unknown topic "${slug}". Create it first via POST /api/admin/topics.`;
-}
-
 adminRouter.post("/topics", async (req, res) => {
   const payload = topicCreateSchema.parse(req.body);
 
@@ -528,6 +525,27 @@ adminRouter.post("/topics", async (req, res) => {
   } catch (error) {
     if (isUniqueConstraint(error)) {
       res.status(409).json({ error: "Topic slug already exists" });
+      return;
+    }
+    throw error;
+  }
+});
+
+adminRouter.post("/subtopics", async (req, res) => {
+  const payload = subtopicCreateSchema.parse(req.body);
+
+  const topicError = await unknownTopicMessage(payload.topicSlug);
+  if (topicError) {
+    res.status(400).json({ error: topicError });
+    return;
+  }
+
+  try {
+    const subtopic = await prisma.subtopic.create({ data: payload });
+    res.status(201).json(subtopic);
+  } catch (error) {
+    if (isUniqueConstraint(error)) {
+      res.status(409).json({ error: "Subtopic slug already exists under this topic" });
       return;
     }
     throw error;

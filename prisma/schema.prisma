@@ -50,6 +50,16 @@ model Topic {
   createdAt DateTime @default(now())
 }
 
+model Subtopic {
+  id        String   @id @default(uuid())
+  topicSlug String
+  slug      String
+  label     String
+  createdAt DateTime @default(now())
+
+  @@unique([topicSlug, slug])
+}
+
 model MangaVolume {
   id           String      @id
   title        String
@@ -100,14 +110,18 @@ model MangaImageAsset {
 }
 
 model VocabularySet {
-  id         String           @id
-  title      String
-  setNumber  String?
-  totalPages Int?
-  coverUrl   String?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  pages      VocabularyPage[]
+  id          String           @id @default(uuid())
+  topic       String
+  subtopic    String
+  contentType String
+  title       String
+  coverUrl    String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  pages       VocabularyPage[]
+  words       VocabularyWord[]
+
+  @@unique([topic, subtopic])
 }
 
 model VocabularyPage {
@@ -146,4 +160,16 @@ model VocabularyImageAsset {
   checksum  String   @id
   url       String
   createdAt DateTime @default(now())
+}
+
+model VocabularyWord {
+  id          String        @id @default(uuid())
+  setId       String
+  set         VocabularySet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  wordIndex   Int
+  term        String
+  furigana    String
+  translation String
+
+  @@unique([setId, wordIndex])
 }

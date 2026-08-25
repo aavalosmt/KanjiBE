@@ -1,13 +1,16 @@
 import type {
   VocabularyEntry as VocabularyEntryRow,
   VocabularyPage as VocabularyPageRow,
-  VocabularySet as VocabularySetRow
+  VocabularySet as VocabularySetRow,
+  VocabularyWord as VocabularyWordRow
 } from "@prisma/client";
 import type {
+  VocabularyContentType,
   VocabularyEntry,
   VocabularyPage,
   VocabularySet,
-  VocabularySetSummary
+  VocabularySetSummary,
+  VocabularyWordEntry
 } from "../types.js";
 
 function parseJsonArray<T>(value: string): T[] {
@@ -43,33 +46,48 @@ export function toVocabularyPage(
   };
 }
 
+export function toVocabularyWord(row: VocabularyWordRow): VocabularyWordEntry {
+  return {
+    word_index: row.wordIndex,
+    term: row.term,
+    furigana: row.furigana,
+    translation: row.translation
+  };
+}
+
 export function toVocabularySetSummary(
-  row: VocabularySetRow & { _count: { pages: number } }
+  row: VocabularySetRow & { _count: { pages: number; words: number } }
 ): VocabularySetSummary {
   return {
     id: row.id,
+    topic: row.topic,
+    subtopic: row.subtopic,
+    content_type: row.contentType as VocabularyContentType,
     title: row.title,
-    set_number: row.setNumber,
-    total_pages: row.totalPages,
     cover_url: row.coverUrl,
-    page_count: row._count.pages,
+    item_count: row.contentType === "list" ? row._count.words : row._count.pages,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString()
   };
 }
 
 export function toVocabularySet(
-  row: VocabularySetRow & { pages: (VocabularyPageRow & { entries: VocabularyEntryRow[] })[] }
+  row: VocabularySetRow & {
+    pages: (VocabularyPageRow & { entries: VocabularyEntryRow[] })[];
+    words: VocabularyWordRow[];
+  }
 ): VocabularySet {
   return {
     id: row.id,
+    topic: row.topic,
+    subtopic: row.subtopic,
+    content_type: row.contentType as VocabularyContentType,
     title: row.title,
-    set_number: row.setNumber,
-    total_pages: row.totalPages,
     cover_url: row.coverUrl,
-    page_count: row.pages.length,
+    item_count: row.contentType === "list" ? row.words.length : row.pages.length,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
-    pages: row.pages.map(toVocabularyPage)
+    pages: row.pages.map(toVocabularyPage),
+    words: row.words.map(toVocabularyWord)
   };
 }

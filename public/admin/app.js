@@ -127,6 +127,90 @@ function openTopicModal() {
   });
 }
 
+function openSubtopicModal(topicSlug) {
+  return new Promise((resolve) => {
+    const host = document.createElement("div");
+    host.className = "modal-backdrop";
+    host.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="subtopic-modal-title">
+        <h2 id="subtopic-modal-title">Nuevo subtema</h2>
+        <p class="muted">Bajo el tema <b>${escapeHtml(topicSlug)}</b>. Aparecerá en el selector de vocabulario.</p>
+        <label class="field">
+          <span>Nombre</span>
+          <input id="subtopic-modal-label" placeholder="Dedos" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Slug</span>
+          <input id="subtopic-modal-slug" placeholder="fingers" autocomplete="off" />
+        </label>
+        <div class="actions">
+          <button class="primary" id="subtopic-modal-create" type="button">Crear</button>
+          <button class="ghost" id="subtopic-modal-cancel" type="button">Cancelar</button>
+        </div>
+      </div>
+    `;
+    document.body.append(host);
+
+    const labelInput = host.querySelector("#subtopic-modal-label");
+    const slugInput = host.querySelector("#subtopic-modal-slug");
+    const createButton = host.querySelector("#subtopic-modal-create");
+    labelInput.focus();
+
+    let slugTouched = false;
+    slugInput.addEventListener("input", () => {
+      slugTouched = true;
+    });
+    labelInput.addEventListener("input", () => {
+      if (!slugTouched) slugInput.value = slugify(labelInput.value);
+    });
+
+    function onKeydown(event) {
+      if (event.key === "Escape") close(null);
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void create();
+      }
+    }
+
+    function close(result) {
+      document.removeEventListener("keydown", onKeydown);
+      host.remove();
+      resolve(result);
+    }
+
+    async function create() {
+      const label = labelInput.value.trim();
+      const slug = slugInput.value.trim();
+      if (!label || !slug) {
+        toast("Nombre y slug son obligatorios", "error");
+        return;
+      }
+      createButton.disabled = true;
+      createButton.textContent = "Creando…";
+      try {
+        const subtopic = await api("/api/admin/subtopics", {
+          method: "POST",
+          body: JSON.stringify({ topicSlug, slug, label })
+        });
+        close(subtopic);
+      } catch (error) {
+        toast(error.message, "error");
+        createButton.disabled = false;
+        createButton.textContent = "Crear";
+      }
+    }
+
+    host.addEventListener("click", (event) => {
+      if (event.target === host) close(null);
+    });
+    document.addEventListener("keydown", onKeydown);
+    host.querySelector("#subtopic-modal-cancel").addEventListener("click", () => close(null));
+    createButton.addEventListener("click", () => {
+      void create();
+    });
+  });
+}
+
 function isKanji(char) {
   const code = char.codePointAt(0) ?? 0;
   return code >= 0x4e00 && code <= 0x9faf;
@@ -1961,25 +2045,45 @@ function bindMangaPageEditor(volume, page, pageIndex) {
   });
 }
 
-function renderVocabularyList(items) {
+function vocabularySetHash(topic, subtopic) {
+  return `/vocabulary/${encodeURIComponent(topic)}/${encodeURIComponent(subtopic)}`;
+}
+
+function vocabularySetApiPath(topic, subtopic) {
+  return `/api/admin/vocabulary/${encodeURIComponent(topic)}/${encodeURIComponent(subtopic)}`;
+}
+
+function renderVocabularyList(items, topics, selectedTopic) {
   const cards = items.length
     ? items
-        .map(
-          (item) => `
+        .map((item) => {
+          const count =
+            item.content_type === "list"
+              ? `${item.item_count} palabra${item.item_count === 1 ? "" : "s"}`
+              : `${item.item_count} página${item.item_count === 1 ? "" : "s"}`;
+          return `
         <article class="card item">
           ${coverMarkup(item.cover_url)}
           <div class="item-body">
-            <div class="kicker">${item.page_count} página${item.page_count === 1 ? "" : "s"}</div>
-            <h2>${escapeHtml(item.title)}${item.set_number ? ` · N.º ${escapeHtml(item.set_number)}` : ""}</h2>
-            <p class="muted">Actualizado ${new Date(item.updated_at).toLocaleString()}</p>
+            <div class="kicker">${escapeHtml(item.topic)} / ${escapeHtml(item.subtopic)}</div>
+            <h2>${escapeHtml(item.title)}</h2>
+            <p class="muted">${count}</p>
             <div class="actions">
-              <a class="primary" href="#/vocabulary/${encodeURIComponent(item.id)}">Ver páginas</a>
+              <a class="primary" href="#${vocabularySetHash(item.topic, item.subtopic)}">Ver</a>
             </div>
           </div>
-        </article>`
-        )
+        </article>`;
+        })
         .join("")
-    : `<div class="empty"><h2>No hay listas de vocabulario todavía</h2><p class="muted">Se cargan desde el cliente desktop OCR vía <code>POST /api/admin/vocabulary/ingest</code>. Ver <code>docs/vocabulary-ingest.md</code>.</p></div>`;
+    : `<div class="empty"><h2>No hay vocabulario todavía</h2><p class="muted">Se carga desde el cliente desktop OCR vía <code>POST /api/admin/vocabulary/ingest</code>. Ver <code>docs/vocabulary-ingest.md</code>.</p></div>`;
+
+  const topicOptions = [
+    `<option value="">Todos los temas</option>`,
+    ...topics.map(
+      (t) =>
+        `<option value="${escapeHtml(t.slug)}" ${selectedTopic === t.slug ? "selected" : ""}>${escapeHtml(t.label)}</option>`
+    )
+  ].join("");
 
   app.innerHTML = layout(
     "vocabulary",
@@ -1989,36 +2093,92 @@ function renderVocabularyList(items) {
           <div class="kicker">Contenido</div>
           <h1>Vocabulario</h1>
         </div>
+        <div class="actions">
+          <select id="topic-filter">${topicOptions}</select>
+          <button class="ghost" id="add-topic" type="button">+ Nuevo tema</button>
+          <button class="ghost" id="add-subtopic" type="button" ${selectedTopic ? "" : "disabled"}>+ Nuevo subtema</button>
+        </div>
       </div>
       <div class="grid">${cards}</div>
     `
   );
   bindLogout();
+
+  document.querySelector("#topic-filter")?.addEventListener("change", async (event) => {
+    const topic = event.target.value;
+    try {
+      const list = await api(`/api/admin/vocabulary?limit=100${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`);
+      renderVocabularyList(list.data, topics, topic);
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
+
+  document.querySelector("#add-topic")?.addEventListener("click", async () => {
+    const topic = await openTopicModal();
+    if (!topic) return;
+    toast("Tema creado", "ok");
+    await route();
+  });
+
+  document.querySelector("#add-subtopic")?.addEventListener("click", async () => {
+    if (!selectedTopic) return;
+    const subtopic = await openSubtopicModal(selectedTopic);
+    if (!subtopic) return;
+    toast("Subtema creado", "ok");
+    await route();
+  });
 }
 
 function vocabularyPageThumb(set, page) {
   const count = page.entries.length;
   return `
     <article class="card item">
-      <a href="#/vocabulary/${encodeURIComponent(set.id)}/pages/${page.page_index}">
+      <a href="#${vocabularySetHash(set.topic, set.subtopic)}/pages/${page.page_index}">
         <img class="cover" src="${escapeHtml(page.image_url)}" alt="Página ${page.page_index}" loading="lazy" />
       </a>
       <div class="item-body">
         <div class="kicker">Página ${page.page_index}</div>
         <p class="muted">${count} entrada${count === 1 ? "" : "s"}</p>
         <div class="actions">
-          <a class="ghost tiny" href="#/vocabulary/${encodeURIComponent(set.id)}/pages/${page.page_index}">Editar</a>
+          <a class="ghost tiny" href="#${vocabularySetHash(set.topic, set.subtopic)}/pages/${page.page_index}">Editar</a>
           <button class="danger tiny" data-del-page="${page.page_index}" type="button">Borrar</button>
         </div>
       </div>
     </article>`;
 }
 
-function renderVocabularySet(set) {
-  const pages = [...set.pages].sort((a, b) => a.page_index - b.page_index);
-  const cards = pages.length
-    ? pages.map((page) => vocabularyPageThumb(set, page)).join("")
-    : `<div class="empty"><h2>Esta lista no tiene páginas</h2></div>`;
+function vocabularyWordRow(word, index) {
+  return `
+    <form class="block vocabulary-word" data-word-index="${index}">
+      <div class="block-head">
+        <b>Palabra ${index + 1}</b>
+        <button class="danger tiny" data-del-word="${index}" type="button">Borrar</button>
+      </div>
+      <label class="field">
+        <span>Término</span>
+        <input class="jp" data-field="term" value="${escapeHtml(word.term)}" />
+      </label>
+      <label class="field">
+        <span>Furigana</span>
+        <input class="jp" data-field="furigana" value="${escapeHtml(word.furigana)}" />
+      </label>
+      <div class="manga-furigana-preview" data-preview></div>
+      <label class="field">
+        <span>Traducción</span>
+        <input data-field="translation" value="${escapeHtml(word.translation)}" />
+      </label>
+      <div class="actions">
+        <button class="primary" type="submit">Guardar</button>
+      </div>
+    </form>`;
+}
+
+function renderVocabularyWordList(set) {
+  const words = [...set.words].sort((a, b) => a.word_index - b.word_index);
+  const rows = words.length
+    ? words.map((word, index) => vocabularyWordRow(word, index)).join("")
+    : `<p class="muted">Este set no tiene palabras.</p>`;
 
   app.innerHTML = layout(
     "vocabulary",
@@ -2026,8 +2186,84 @@ function renderVocabularySet(set) {
       <div class="row">
         <div>
           <div class="kicker"><a href="#/vocabulary">Vocabulario</a></div>
-          <h1>${escapeHtml(set.title)}${set.set_number ? ` · N.º ${escapeHtml(set.set_number)}` : ""}</h1>
-          <p class="muted">${pages.length} página${pages.length === 1 ? "" : "s"}</p>
+          <h1>${escapeHtml(set.title)}</h1>
+          <p class="muted">${escapeHtml(set.topic)} / ${escapeHtml(set.subtopic)} · ${words.length} palabra${words.length === 1 ? "" : "s"}</p>
+        </div>
+      </div>
+      <div class="grid">${rows}</div>
+    `
+  );
+  bindLogout();
+  bindVocabularyWordList(set);
+}
+
+function bindVocabularyWordList(set) {
+  document.querySelectorAll(".vocabulary-word").forEach((form) => {
+    const preview = form.querySelector("[data-preview]");
+    const furiganaField = form.querySelector('[data-field="furigana"]');
+    const updatePreview = () => {
+      preview.replaceChildren(renderFurigana(furiganaField.value));
+    };
+    updatePreview();
+    furiganaField.addEventListener("input", updatePreview);
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const index = Number(form.dataset.wordIndex);
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      const body = {
+        term: form.querySelector('[data-field="term"]').value.trim(),
+        furigana: furiganaField.value,
+        translation: form.querySelector('[data-field="translation"]').value.trim()
+      };
+      try {
+        await api(`${vocabularySetApiPath(set.topic, set.subtopic)}/words/${index}`, {
+          method: "PATCH",
+          body: JSON.stringify(body)
+        });
+        toast("Palabra guardada", "ok");
+        await route();
+      } catch (error) {
+        toast(error.message, "error");
+        button.disabled = false;
+      }
+    });
+
+    form.querySelector("[data-del-word]")?.addEventListener("click", async () => {
+      if (!confirm("¿Borrar esta palabra?")) return;
+      try {
+        await api(`${vocabularySetApiPath(set.topic, set.subtopic)}/words/${form.dataset.wordIndex}`, {
+          method: "DELETE"
+        });
+        toast("Palabra borrada", "ok");
+        await route();
+      } catch (error) {
+        toast(error.message, "error");
+      }
+    });
+  });
+}
+
+function renderVocabularySet(set) {
+  if (set.content_type === "list") {
+    renderVocabularyWordList(set);
+    return;
+  }
+
+  const pages = [...set.pages].sort((a, b) => a.page_index - b.page_index);
+  const cards = pages.length
+    ? pages.map((page) => vocabularyPageThumb(set, page)).join("")
+    : `<div class="empty"><h2>Este set no tiene páginas</h2></div>`;
+
+  app.innerHTML = layout(
+    "vocabulary",
+    `
+      <div class="row">
+        <div>
+          <div class="kicker"><a href="#/vocabulary">Vocabulario</a></div>
+          <h1>${escapeHtml(set.title)}</h1>
+          <p class="muted">${escapeHtml(set.topic)} / ${escapeHtml(set.subtopic)} · ${pages.length} página${pages.length === 1 ? "" : "s"}</p>
         </div>
       </div>
       <div class="grid">${cards}</div>
@@ -2039,10 +2275,9 @@ function renderVocabularySet(set) {
     button.addEventListener("click", async () => {
       if (!confirm("¿Borrar esta página y sus entradas?")) return;
       try {
-        await api(
-          `/api/admin/vocabulary/${encodeURIComponent(set.id)}/pages/${button.dataset.delPage}`,
-          { method: "DELETE" }
-        );
+        await api(`${vocabularySetApiPath(set.topic, set.subtopic)}/pages/${button.dataset.delPage}`, {
+          method: "DELETE"
+        });
         toast("Página borrada", "ok");
         await route();
       } catch (error) {
@@ -2118,12 +2353,12 @@ function renderVocabularyPageEditor(set, page, pageIndex) {
     `
       <div class="row">
         <div>
-          <div class="kicker"><a href="#/vocabulary">Vocabulario</a> · <a href="#/vocabulary/${encodeURIComponent(set.id)}">${escapeHtml(set.title)}</a></div>
+          <div class="kicker"><a href="#/vocabulary">Vocabulario</a> · <a href="#${vocabularySetHash(set.topic, set.subtopic)}">${escapeHtml(set.title)}</a></div>
           <h1>Página ${pageIndex}</h1>
         </div>
         <div class="actions">
-          ${prevPage ? `<a class="ghost" href="#/vocabulary/${encodeURIComponent(set.id)}/pages/${prevPage.page_index}">← Anterior</a>` : ""}
-          ${nextPage ? `<a class="ghost" href="#/vocabulary/${encodeURIComponent(set.id)}/pages/${nextPage.page_index}">Siguiente →</a>` : ""}
+          ${prevPage ? `<a class="ghost" href="#${vocabularySetHash(set.topic, set.subtopic)}/pages/${prevPage.page_index}">← Anterior</a>` : ""}
+          ${nextPage ? `<a class="ghost" href="#${vocabularySetHash(set.topic, set.subtopic)}/pages/${nextPage.page_index}">Siguiente →</a>` : ""}
         </div>
       </div>
       <div class="editor-grid">
@@ -2182,7 +2417,7 @@ function bindVocabularyPageEditor(set, page, pageIndex) {
       };
       try {
         await api(
-          `/api/admin/vocabulary/${encodeURIComponent(set.id)}/pages/${pageIndex}/entries/${index}`,
+          `${vocabularySetApiPath(set.topic, set.subtopic)}/pages/${pageIndex}/entries/${index}`,
           { method: "PATCH", body: JSON.stringify(body) }
         );
         toast("Entrada guardada", "ok");
@@ -2253,7 +2488,7 @@ function bindVocabularyPageEditor(set, page, pageIndex) {
     const body = new FormData();
     body.append("image", file);
     try {
-      await api(`/api/admin/vocabulary/${encodeURIComponent(set.id)}/pages/${pageIndex}/image`, {
+      await api(`${vocabularySetApiPath(set.topic, set.subtopic)}/pages/${pageIndex}/image`, {
         method: "PUT",
         body
       });
@@ -2267,11 +2502,11 @@ function bindVocabularyPageEditor(set, page, pageIndex) {
   document.querySelector("#vocabulary-delete-page")?.addEventListener("click", async () => {
     if (!confirm("¿Borrar esta página y sus entradas?")) return;
     try {
-      await api(`/api/admin/vocabulary/${encodeURIComponent(set.id)}/pages/${pageIndex}`, {
+      await api(`${vocabularySetApiPath(set.topic, set.subtopic)}/pages/${pageIndex}`, {
         method: "DELETE"
       });
       toast("Página borrada", "ok");
-      go(`/vocabulary/${set.id}`);
+      go(vocabularySetHash(set.topic, set.subtopic));
     } catch (error) {
       toast(error.message, "error");
     }
@@ -2307,21 +2542,26 @@ async function route() {
       return;
     }
     if (section === "vocabulary" && !id) {
-      const list = await api("/api/admin/vocabulary?limit=100");
-      renderVocabularyList(list.data);
+      const [list, topics] = await Promise.all([
+        api("/api/admin/vocabulary?limit=100"),
+        api("/api/topics")
+      ]);
+      renderVocabularyList(list.data, topics.data);
       return;
     }
-    if (section === "vocabulary" && id && rest[0] === "pages" && rest[1] !== undefined) {
-      const pageIndex = Number(rest[1]);
+    if (section === "vocabulary" && id && rest[0] && rest[1] === "pages" && rest[2] !== undefined) {
+      const topic = id;
+      const subtopic = rest[0];
+      const pageIndex = Number(rest[2]);
       const [set, page] = await Promise.all([
-        api(`/api/admin/vocabulary/${encodeURIComponent(id)}`),
-        api(`/api/admin/vocabulary/${encodeURIComponent(id)}/pages/${pageIndex}`)
+        api(vocabularySetApiPath(topic, subtopic)),
+        api(`${vocabularySetApiPath(topic, subtopic)}/pages/${pageIndex}`)
       ]);
       renderVocabularyPageEditor(set, page, pageIndex);
       return;
     }
-    if (section === "vocabulary" && id) {
-      const set = await api(`/api/admin/vocabulary/${encodeURIComponent(id)}`);
+    if (section === "vocabulary" && id && rest[0]) {
+      const set = await api(vocabularySetApiPath(id, rest[0]));
       renderVocabularySet(set);
       return;
     }

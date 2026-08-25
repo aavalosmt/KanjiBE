@@ -160,6 +160,14 @@ export const topicCreateSchema = z.object({
   label: z.string().trim().min(1)
 });
 
+export const subtopicSlug = topicSlug;
+
+export const subtopicCreateSchema = z.object({
+  topicSlug: z.string().trim().min(1),
+  slug: subtopicSlug,
+  label: z.string().trim().min(1)
+});
+
 export function normalizeBlocks(
   blocks: z.infer<typeof blockSchema>[]
 ): ContentBlock[] {
@@ -341,25 +349,57 @@ export const vocabularyPageIngestSchema = z.object({
   entries: z.array(vocabularyEntryIngestSchema).default([])
 });
 
-export const vocabularyIngestSchema = z.object({
-  schema_version: z
-    .string()
-    .refine((value) => (SUPPORTED_VOCABULARY_SCHEMA_VERSIONS as readonly string[]).includes(value), {
-      message: `Unsupported schema_version. Supported: ${SUPPORTED_VOCABULARY_SCHEMA_VERSIONS.join(", ")}`
-    }),
-  set_id: z.string().uuid(),
+export const vocabularyWordIngestSchema = z.object({
+  term: z.string().trim().min(1),
+  furigana: z.string().default(""),
+  translation: z.string().trim().min(1)
+});
+
+const vocabularyIngestSchemaVersion = z
+  .string()
+  .refine((value) => (SUPPORTED_VOCABULARY_SCHEMA_VERSIONS as readonly string[]).includes(value), {
+    message: `Unsupported schema_version. Supported: ${SUPPORTED_VOCABULARY_SCHEMA_VERSIONS.join(", ")}`
+  });
+
+const vocabularyIngestCommon = {
+  schema_version: vocabularyIngestSchemaVersion,
+  topic: z.string().trim().min(1),
+  subtopic: z.string().trim().min(1),
   title: z.string().trim().min(1),
-  set_number: z.string().trim().min(1).optional(),
-  total_pages: z.number().int().positive().optional(),
-  cover_url: z.string().trim().min(1).optional(),
+  cover_url: z.string().trim().min(1).optional()
+};
+
+export const vocabularyImageIngestSchema = z.object({
+  ...vocabularyIngestCommon,
+  content_type: z.literal("image"),
   pages: z.array(vocabularyPageIngestSchema).min(1)
 });
+
+export const vocabularyListIngestSchema = z.object({
+  ...vocabularyIngestCommon,
+  content_type: z.literal("list"),
+  words: z.array(vocabularyWordIngestSchema).min(1)
+});
+
+export const vocabularyIngestSchema = z.discriminatedUnion("content_type", [
+  vocabularyImageIngestSchema,
+  vocabularyListIngestSchema
+]);
 
 export const vocabularySetPatchSchema = z
   .object({
     title: z.string().trim().min(1).optional(),
-    set_number: z.string().trim().min(1).nullable().optional(),
     cover_url: z.string().trim().min(1).nullable().optional()
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required"
+  });
+
+export const vocabularyWordPatchSchema = z
+  .object({
+    term: z.string().trim().min(1).optional(),
+    furigana: z.string().optional(),
+    translation: z.string().trim().min(1).optional()
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required"

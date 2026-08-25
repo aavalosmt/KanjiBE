@@ -14,6 +14,7 @@ import { lyricsRouter } from "./routes/lyrics.js";
 import { mangaRouter } from "./routes/manga.js";
 import { mangaAdminRouter } from "./routes/mangaAdmin.js";
 import { storiesRouter } from "./routes/stories.js";
+import { subtopicsRouter } from "./routes/subtopics.js";
 import { topicsRouter } from "./routes/topics.js";
 import { uploadRouter } from "./routes/upload.js";
 import { vocabularyRouter } from "./routes/vocabulary.js";
@@ -72,6 +73,7 @@ export function createApp() {
   app.use("/api/lyrics", lyricsRouter);
   app.use("/api/conversations", conversationsRouter);
   app.use("/api/topics", topicsRouter);
+  app.use("/api/subtopics", subtopicsRouter);
   app.use("/api/lookup", lookupRouter);
   app.use("/api/analyze", analyzeRouter);
   app.use("/api/manga", mangaRouter);

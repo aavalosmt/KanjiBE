@@ -76,6 +76,13 @@ export type Topic = {
   label: string;
 };
 
+export type Subtopic = {
+  id: string;
+  topicSlug: string;
+  slug: string;
+  label: string;
+};
+
 export type Paginated<T> = {
   data: T[];
   pagination: {
@@ -160,17 +167,28 @@ export type VocabularyPage = {
   entries: VocabularyEntry[];
 };
 
+export type VocabularyContentType = "image" | "list";
+
+export type VocabularyWordEntry = {
+  word_index: number;
+  term: string;
+  furigana: string;
+  translation: string;
+};
+
 export type VocabularySetSummary = {
   id: string;
+  topic: string;
+  subtopic: string;
+  content_type: VocabularyContentType;
   title: string;
-  set_number: string | null;
-  total_pages: number | null;
   cover_url: string | null;
-  page_count: number;
+  item_count: number;
   created_at: string;
   updated_at: string;
 };
 
 export type VocabularySet = VocabularySetSummary & {
   pages: VocabularyPage[];
+  words: VocabularyWordEntry[];
 };

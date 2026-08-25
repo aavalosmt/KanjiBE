@@ -38,10 +38,11 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/conversations?page=1&limit=20&topic=convenience_store&level=N4`
 - `GET /api/conversations/:id` — bloques `type: "dialogue"` con `speaker` por turno
 - `GET /api/topics` — lista de temas registrados (`{ id, slug, label }`), para poblar filtros. El `topic` de una conversación debe ser un `slug` ya registrado aquí.
+- `GET /api/subtopics?topic=body` — lista de subtemas registrados (`{ id, topicSlug, slug, label }`), opcionalmente filtrados por topic. El `topic`/`subtopic` de un set de vocabulario deben ser slugs ya registrados aquí.
 - `GET /api/manga?page=1&limit=20` — tomos (sin `pages`)
 - `GET /api/manga/:id` — tomo completo con `pages[].dialogues[]` (OCR + morfología ya resuelta por el cliente desktop, ver [`docs/manga-ingest.md`](docs/manga-ingest.md))
-- `GET /api/vocabulary?page=1&limit=20` — listas de vocabulario (sin `pages`)
-- `GET /api/vocabulary/:id` — lista completa con `pages[].entries[]` (mismo contrato que manga, ver [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md))
+- `GET /api/vocabulary?page=1&limit=20&topic=body` — sets de vocabulario (sin `pages`/`words`)
+- `GET /api/vocabulary/:topic/:subtopic` — set completo: `pages[].entries[]` si es imagen, `words[]` si es lista (ver [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md))
 - Admin: `GET /api/admin/lrclib/search?q=` y `POST /api/admin/lrclib/import` `{ id }` — busca, sincroniza, tokeniza y guarda
 - `GET /health`
 - `GET /api/lookup?q=知らない` — lematiza (知る) y describe el verbo en inglés (`godan verb 知る in the negative form`). También `GET /api/lookup/知らない`.
@@ -63,6 +64,7 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
 - `PUT /api/admin/conversations/:id`
 - `DELETE /api/admin/conversations/:id`
 - `POST /api/admin/topics` `{ slug, label }` — `slug` en snake_case; 409 si ya existe
+- `POST /api/admin/subtopics` `{ topicSlug, slug, label }` — `slug` en snake_case bajo un topic existente; 400 si el topic no existe, 409 si el subtopic ya existe
 - `POST /api/admin/upload` — `multipart/form-data` con campo `file` o `image`
 - Manga (contrato completo en [`docs/manga-ingest.md`](docs/manga-ingest.md)):
   - `POST /api/admin/manga/upload-image` — `multipart/form-data`, campos `image` + `image_checksum` (sha256), dedup por checksum
@@ -70,12 +72,12 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
   - `GET /api/admin/manga`, `PATCH /api/admin/manga/:id` (title/volume_number/cover_url), `GET /api/admin/manga/:id/pages/:pageIndex`
   - `PATCH /api/admin/manga/:id/pages/:pageIndex/dialogues/:dialogueIndex`
   - `PUT /api/admin/manga/:id/pages/:pageIndex/image`, `DELETE /api/admin/manga/:id/pages/:pageIndex`
-- Vocabulario (mismo contrato que manga, completo en [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md)):
-  - `POST /api/admin/vocabulary/upload-image` — `multipart/form-data`, campos `image` + `image_checksum` (sha256), dedup por checksum
-  - `POST /api/admin/vocabulary/ingest` — upsert de una lista + sus páginas/entradas, idempotente por `set_id`
-  - `GET /api/admin/vocabulary`, `PATCH /api/admin/vocabulary/:id` (title/set_number/cover_url), `GET /api/admin/vocabulary/:id/pages/:pageIndex`
-  - `PATCH /api/admin/vocabulary/:id/pages/:pageIndex/entries/:entryIndex`
-  - `PUT /api/admin/vocabulary/:id/pages/:pageIndex/image`, `DELETE /api/admin/vocabulary/:id/pages/:pageIndex`
+- Vocabulario (dirigido por `topic`/`subtopic` en vez de un id, completo en [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md)):
+  - `POST /api/admin/vocabulary/upload-image` — `multipart/form-data`, campos `image` + `image_checksum` (sha256), dedup por checksum (solo sets `content_type: "image"`)
+  - `POST /api/admin/vocabulary/ingest` — upsert de un set + sus páginas/entradas o palabras, idempotente por `(topic, subtopic)`; `content_type: "image" | "list"` decide la forma
+  - `GET /api/admin/vocabulary`, `PATCH /api/admin/vocabulary/:topic/:subtopic` (title/cover_url), `GET /api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex`
+  - `PATCH /api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex/entries/:entryIndex`, `PUT .../pages/:pageIndex/image`, `DELETE .../pages/:pageIndex` (formato imagen)
+  - `PATCH /api/admin/vocabulary/:topic/:subtopic/words/:wordIndex`, `DELETE .../words/:wordIndex` (formato lista)
 
 ## Hosting (Railway)
 

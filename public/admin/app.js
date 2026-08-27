@@ -2,6 +2,11 @@ const KEY = "kanjibe.adminKey";
 const app = document.querySelector("#app");
 const toastEl = document.querySelector("#toast");
 
+// Which translation the story/lyric/conversation editor is currently showing.
+// "es" is the original (legacy) language, edited via the normal PUT; any
+// other value is an overlay layered on top, edited via PUT .../translations/:lang.
+let editorLang = "es";
+
 function getKey() {
   return localStorage.getItem(KEY) ?? "";
 }
@@ -1148,6 +1153,29 @@ function bindEditor(kind, isNew, id) {
     tab.addEventListener("click", () => setView(tab.dataset.view));
   });
 
+  document.querySelectorAll(".lang-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      if (tab.dataset.lang === editorLang) return;
+      editorLang = tab.dataset.lang;
+      void route();
+    });
+  });
+
+  if (editorLang !== "es") {
+    form.querySelectorAll("[name], [data-field]").forEach((field) => {
+      if (field.name !== "translation" && field.dataset.field !== "translation") {
+        field.disabled = true;
+      }
+    });
+    document
+      .querySelectorAll(
+        '#add-row [data-add], .block [data-remove], .block [data-up], .block [data-down], .block [data-upload], .block [data-wrap], #upload-cover, #add-topic'
+      )
+      .forEach((button) => {
+        button.disabled = true;
+      });
+  }
+
   document.querySelector("#copy-furigana-rules")?.addEventListener("click", async () => {
     await navigator.clipboard.writeText(FURIGANA_RULES);
     toast("Reglas de furigana copiadas", "ok");
@@ -1260,11 +1288,28 @@ function bindEditor(kind, isNew, id) {
     event.preventDefault();
     let data, blocks;
     try {
-      ({ data, blocks } = collectForm(form, { strict: true }));
+      ({ data, blocks } = collectForm(form, { strict: editorLang === "es" }));
     } catch (error) {
       toast(error.message, "error");
       return;
     }
+
+    if (editorLang !== "es") {
+      const overlayBlocks = blocks
+        .filter((block) => block.id)
+        .map((block) => ({ id: block.id, translation: block.translation || null }));
+      try {
+        await api(`/api/admin/${kind}/${id}/translations/${editorLang}`, {
+          method: "PUT",
+          body: JSON.stringify({ translation: data.translation || null, blocks: overlayBlocks })
+        });
+        toast("Guardado", "ok");
+      } catch (error) {
+        toast(error.message, "error");
+      }
+      return;
+    }
+
     const payload = {
       title: data.title,
       translation: data.translation || null,
@@ -1362,12 +1407,29 @@ function renderEditor(kind, item, topics = []) {
               <div class="kicker">${isNew ? "Crear" : "Editar"}</div>
               <h1>${escapeHtml(title)}</h1>
             </div>
-            <div class="view-toggle" role="tablist">
-              <button class="tiny view-tab active" data-view="form" type="button">Formulario</button>
-              <button class="tiny view-tab" data-view="json" type="button">JSON</button>
-            </div>
+            ${
+              editorLang === "es"
+                ? `<div class="view-toggle" role="tablist">
+                    <button class="tiny view-tab active" data-view="form" type="button">Formulario</button>
+                    <button class="tiny view-tab" data-view="json" type="button">JSON</button>
+                  </div>`
+                : ""
+            }
+            ${
+              isNew
+                ? ""
+                : `<div class="view-toggle" role="tablist">
+                    <button class="tiny lang-tab ${editorLang === "es" ? "active" : ""}" data-lang="es" type="button">ES (original)</button>
+                    <button class="tiny lang-tab ${editorLang === "en" ? "active" : ""}" data-lang="en" type="button">EN</button>
+                  </div>`
+            }
             <a class="ghost" href="#/${kind}">Volver</a>
           </div>
+          ${
+            editorLang !== "es"
+              ? `<p class="muted">Editando la traducción en inglés. El japonés, tokens y estructura de bloques pertenecen al original (ES) y no se pueden cambiar aquí.</p>`
+              : ""
+          }
           <div id="form-fields">
           <div class="meta-grid">
             <label class="field">
@@ -1406,7 +1468,7 @@ function renderEditor(kind, item, topics = []) {
             </label>
           </div>
           <label class="field">
-            <span>Traducción del título</span>
+            <span>Traducción del título ${editorLang === "es" ? "" : `(${editorLang.toUpperCase()})`}</span>
             <input name="translation" value="${escapeHtml(item?.translation)}" />
           </label>
           <label class="field">
@@ -2149,23 +2211,24 @@ function vocabularyPageThumb(set, page) {
 }
 
 function vocabularyWordRow(word, index) {
+  const disabled = editorLang === "es" ? "" : "disabled";
   return `
     <form class="block vocabulary-word" data-word-index="${index}">
       <div class="block-head">
         <b>Palabra ${index + 1}</b>
-        <button class="danger tiny" data-del-word="${index}" type="button">Borrar</button>
+        <button class="danger tiny" data-del-word="${index}" type="button" ${disabled}>Borrar</button>
       </div>
       <label class="field">
         <span>Término</span>
-        <input class="jp" data-field="term" value="${escapeHtml(word.term)}" />
+        <input class="jp" data-field="term" value="${escapeHtml(word.term)}" ${disabled} />
       </label>
       <label class="field">
         <span>Furigana</span>
-        <input class="jp" data-field="furigana" value="${escapeHtml(word.furigana)}" />
+        <input class="jp" data-field="furigana" value="${escapeHtml(word.furigana)}" ${disabled} />
       </label>
       <div class="manga-furigana-preview" data-preview></div>
       <label class="field">
-        <span>Traducción</span>
+        <span>Traducción ${editorLang === "es" ? "" : `(${editorLang.toUpperCase()})`}</span>
         <input data-field="translation" value="${escapeHtml(word.translation)}" />
       </label>
       <div class="actions">
@@ -2189,6 +2252,10 @@ function renderVocabularyWordList(set) {
           <h1>${escapeHtml(set.title)}</h1>
           <p class="muted">${escapeHtml(set.topic)} / ${escapeHtml(set.subtopic)} · ${words.length} palabra${words.length === 1 ? "" : "s"}</p>
         </div>
+        <div class="view-toggle" role="tablist">
+          <button class="tiny lang-tab ${editorLang === "es" ? "active" : ""}" data-lang="es" type="button">ES (original)</button>
+          <button class="tiny lang-tab ${editorLang === "en" ? "active" : ""}" data-lang="en" type="button">EN</button>
+        </div>
       </div>
       <div class="grid">${rows}</div>
     `
@@ -2198,6 +2265,14 @@ function renderVocabularyWordList(set) {
 }
 
 function bindVocabularyWordList(set) {
+  document.querySelectorAll(".lang-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      if (tab.dataset.lang === editorLang) return;
+      editorLang = tab.dataset.lang;
+      void route();
+    });
+  });
+
   document.querySelectorAll(".vocabulary-word").forEach((form) => {
     const preview = form.querySelector("[data-preview]");
     const furiganaField = form.querySelector('[data-field="furigana"]');
@@ -2212,16 +2287,26 @@ function bindVocabularyWordList(set) {
       const index = Number(form.dataset.wordIndex);
       const button = form.querySelector('button[type="submit"]');
       button.disabled = true;
-      const body = {
-        term: form.querySelector('[data-field="term"]').value.trim(),
-        furigana: furiganaField.value,
-        translation: form.querySelector('[data-field="translation"]').value.trim()
-      };
+      const translation = form.querySelector('[data-field="translation"]').value.trim();
       try {
-        await api(`${vocabularySetApiPath(set.topic, set.subtopic)}/words/${index}`, {
-          method: "PATCH",
-          body: JSON.stringify(body)
-        });
+        if (editorLang === "es") {
+          await api(`${vocabularySetApiPath(set.topic, set.subtopic)}/words/${index}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              term: form.querySelector('[data-field="term"]').value.trim(),
+              furigana: furiganaField.value,
+              translation
+            })
+          });
+        } else {
+          await api(
+            `${vocabularySetApiPath(set.topic, set.subtopic)}/words/${index}/translations/${editorLang}`,
+            {
+              method: "PUT",
+              body: JSON.stringify({ translation })
+            }
+          );
+        }
         toast("Palabra guardada", "ok");
         await route();
       } catch (error) {
@@ -2561,7 +2646,7 @@ async function route() {
       return;
     }
     if (section === "vocabulary" && id && rest[0]) {
-      const set = await api(vocabularySetApiPath(id, rest[0]));
+      const set = await api(`${vocabularySetApiPath(id, rest[0])}?lang=${encodeURIComponent(editorLang)}`);
       renderVocabularySet(set);
       return;
     }
@@ -2625,7 +2710,9 @@ async function route() {
     }
     if (section === "stories" || section === "lyrics" || section === "conversations") {
       const [item, topics] = await Promise.all([
-        id === "new" ? Promise.resolve(null) : api(`/api/${section}/${id}`),
+        id === "new"
+          ? Promise.resolve(null)
+          : api(`/api/${section}/${id}?lang=${encodeURIComponent(editorLang)}`),
         section === "conversations" ? api("/api/topics") : Promise.resolve(null)
       ]);
       renderEditor(section, item, topics?.data ?? []);
@@ -2640,6 +2727,7 @@ async function route() {
 }
 
 window.addEventListener("hashchange", () => {
+  editorLang = "es";
   void route();
 });
 

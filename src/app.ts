@@ -9,6 +9,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminRouter } from "./routes/admin.js";
 import { analyzeRouter } from "./routes/analyze.js";
 import { conversationsRouter } from "./routes/conversations.js";
+import { kanjiRouter } from "./routes/kanji.js";
 import { lookupRouter } from "./routes/lookup.js";
 import { lyricsRouter } from "./routes/lyrics.js";
 import { mangaRouter } from "./routes/manga.js";
@@ -74,6 +75,7 @@ export function createApp() {
   app.use("/api/conversations", conversationsRouter);
   app.use("/api/topics", topicsRouter);
   app.use("/api/subtopics", subtopicsRouter);
+  app.use("/api/kanji", kanjiRouter);
   app.use("/api/lookup", lookupRouter);
   app.use("/api/analyze", analyzeRouter);
   app.use("/api/manga", mangaRouter);

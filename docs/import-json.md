@@ -75,3 +75,18 @@ No inventes ids. coverUrl puede ser null.
 ```
 
 Ejemplo completo: `docs/examples/import.sample.json`.
+
+## Otros idiomas de traducción
+
+Todo lo de arriba (`translation` en el JSON, el tokenizador de Gemini) sigue produciendo español únicamente — es el idioma "original" de cada item y bloque, y se sigue editando con los endpoints de siempre (`POST`/`PUT`/`PATCH`).
+
+Para añadir una traducción en otro idioma (p. ej. inglés) sobre un story/lyric/conversation/palabra de vocabulario ya existente, usa:
+
+```
+PUT /api/admin/stories/:id/translations/:lang
+PUT /api/admin/lyrics/:id/translations/:lang
+PUT /api/admin/conversations/:id/translations/:lang
+PUT /api/admin/vocabulary/:topic/:subtopic/words/:wordIndex/translations/:lang
+```
+
+con body `{ "translation"?, "blocks"?: [{ "id", "translation" }] }` (solo `{ "translation" }` para palabras de vocabulario). `:lang` no puede ser `es`. Los endpoints públicos (`GET /api/stories/:id?lang=en`, etc.) devuelven esa traducción cuando existe, y el español original como respaldo cuando no — ver `docs/spec.md` §3.6.

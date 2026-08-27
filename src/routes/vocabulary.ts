@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { toVocabularySet, toVocabularySetSummary } from "../lib/vocabularySerialize.js";
 import { asString, parsePagination } from "../lib/pagination.js";
+import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
 
 export const vocabularyRouter = Router();
 
@@ -28,6 +29,7 @@ vocabularyRouter.get("/", async (req, res) => {
 });
 
 vocabularyRouter.get("/:topic/:subtopic", async (req, res) => {
+  const lang = normalizeLang(req.query.lang);
   const set = await prisma.vocabularySet.findUnique({
     where: { topic_subtopic: { topic: req.params.topic, subtopic: req.params.subtopic } },
     include: {
@@ -44,5 +46,11 @@ vocabularyRouter.get("/:topic/:subtopic", async (req, res) => {
     return;
   }
 
-  res.json(toVocabularySet(set));
+  const overlay = await fetchTranslationOverlay(
+    "vocabularyWord",
+    set.words.map((word) => word.id),
+    lang
+  );
+
+  res.json(toVocabularySet(set, lang, overlay));
 });

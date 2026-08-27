@@ -12,6 +12,7 @@ import type {
   VocabularySetSummary,
   VocabularyWordEntry
 } from "../types.js";
+import { LEGACY_LANG, resolveText, type EntityOverlay, type TranslationOverlay } from "./translations.js";
 
 function parseJsonArray<T>(value: string): T[] {
   try {
@@ -46,12 +47,18 @@ export function toVocabularyPage(
   };
 }
 
-export function toVocabularyWord(row: VocabularyWordRow): VocabularyWordEntry {
+export function toVocabularyWord(
+  row: VocabularyWordRow,
+  lang: string = LEGACY_LANG,
+  overlay?: EntityOverlay
+): VocabularyWordEntry {
+  const resolved = resolveText(row.translation, overlay?.get(""), lang);
   return {
     word_index: row.wordIndex,
     term: row.term,
     furigana: row.furigana,
-    translation: row.translation
+    translation: resolved.text ?? "",
+    translationLang: resolved.lang
   };
 }
 
@@ -75,7 +82,9 @@ export function toVocabularySet(
   row: VocabularySetRow & {
     pages: (VocabularyPageRow & { entries: VocabularyEntryRow[] })[];
     words: VocabularyWordRow[];
-  }
+  },
+  lang: string = LEGACY_LANG,
+  wordOverlay?: TranslationOverlay
 ): VocabularySet {
   return {
     id: row.id,
@@ -88,6 +97,6 @@ export function toVocabularySet(
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
     pages: row.pages.map(toVocabularyPage),
-    words: row.words.map(toVocabularyWord)
+    words: row.words.map((word) => toVocabularyWord(word, lang, wordOverlay?.get(word.id)))
   };
 }

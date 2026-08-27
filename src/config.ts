@@ -22,7 +22,8 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? "*",
   uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
-  geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.5-flash"
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
+  defaultLang: process.env.DEFAULT_LANG ?? "en"
 };
 
 if (!config.adminApiKey && config.nodeEnv === "production") {

@@ -230,6 +230,35 @@ export function normalizeImportPayload(body: unknown): unknown {
   return body;
 }
 
+export const localeParam = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z]{2}(-[a-z]{2})?$/, "lang must look like a locale code, e.g. en or en-us");
+
+const overlayText = z.string().trim().min(1).nullable().optional();
+
+export const translationOverlaySchema = z
+  .object({
+    translation: overlayText,
+    blocks: z
+      .array(
+        z.object({
+          id: z.string().trim().min(1),
+          translation: z.string().trim().min(1).nullable()
+        })
+      )
+      .optional()
+  })
+  .refine(
+    (value) => value.translation !== undefined || (value.blocks && value.blocks.length > 0),
+    { message: "Provide translation and/or blocks" }
+  );
+
+export const wordTranslationOverlaySchema = z.object({
+  translation: z.string().trim().min(1)
+});
+
 export function parseBlocks(value: unknown): ContentBlock[] {
   const parsed = z.array(blockSchema).safeParse(value);
   if (!parsed.success) {

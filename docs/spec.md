@@ -44,7 +44,8 @@ The API stores this syntax as-is. Alignment is a client concern.
   "id": "String (UUID)",
   "type": "text | image | header | dialogue",
   "content": "String (Tokenized Markdown text if type == text, header, or dialogue)",
-  "translation": "String (Optional - Spanish/English translation of the block)",
+  "translation": "String (Optional - translation of the block, in the language resolved by ?lang=, see 3.6)",
+  "translationLang": "String (locale actually returned, e.g. \"en\" or \"es\" — see 3.6)",
   "url": "String (Only if type == image)",
   "caption": "String (Optional)",
   "speaker": "String (Required if type == dialogue, e.g. \"Clerk\", \"You\")",
@@ -72,7 +73,8 @@ A scripted chat-style dialogue between two or more speakers (e.g. a convenience 
   "title": "String",
   "topic": "String (slug of a registered Topic, e.g. \"convenience_store\", \"immigration\")",
   "level": "String (Optional JLPT level)",
-  "translation": "String (Optional)",
+  "translation": "String (Optional, resolved per ?lang= — see 3.6)",
+  "translationLang": "String (locale actually returned)",
   "coverUrl": "String (Optional)",
   "blocks": "Block[]",
   "createdAt": "ISO 8601 DateTime",
@@ -92,11 +94,22 @@ A small managed registry acting as an enum of valid conversation topics/scenario
 }
 ```
 
+### 3.6 Translation Language (`?lang=`)
+
+Every public GET endpoint for Stories, Lyrics, Conversations, and Vocabulary words accepts an optional `?lang=` query parameter (e.g. `?lang=en`, `?lang=es`). If omitted, it defaults to `en`.
+
+Content was originally ingested with a single Spanish translation per item/block (still the case for most of the existing catalog). Additional languages are layered on top per item, per block, and per vocabulary word. If the requested (or default) language has no translation stored for a given item/block, the API falls back to the original Spanish text rather than returning `null`. Every response that carries a `translation` field also carries a sibling `translationLang` field naming the locale actually returned, so a client can tell a real translation from a fallback.
+
+Additional languages are added via the admin-only `PUT /api/admin/{stories|lyrics|conversations}/:id/translations/:lang` endpoints (and `PUT /api/admin/vocabulary/:topic/:subtopic/words/:wordIndex/translations/:lang` for vocabulary), which layer a translation for `:lang` on top of the existing Spanish content without altering it. `:lang` may not be `es` — the original Spanish translation is edited through the existing `PUT`/`PATCH` endpoints for that content type.
+
+Manga is not covered by this — `MangaDialogue` has no translation field at all yet.
+
 ## 4. REST API Specification
 
 Implemented in this repository:
 
-- Public: `GET /api/stories`, `GET /api/stories/:id`, `GET /api/lyrics`, `GET /api/lyrics/:id`, `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/topics`, `GET /api/lookup?q=`
+- Public: `GET /api/stories`, `GET /api/stories/:id`, `GET /api/lyrics`, `GET /api/lyrics/:id`, `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/topics`, `GET /api/lookup?q=`, `GET /api/vocabulary`, `GET /api/vocabulary/:topic/:subtopic`
   - `GET /api/conversations` accepts `?topic=` and `?level=` query filters, plus `?page=`/`?limit=` pagination, matching the Story/Lyric list endpoints.
+  - All of the above (except `/api/topics` and `/api/lookup`) accept `?lang=` — see 3.6.
   - `GET /api/topics` returns all registered topics sorted by `label`, for building filter UIs.
-- Admin: `POST|PUT|DELETE /api/admin/stories`, `POST|PUT|DELETE /api/admin/lyrics`, `POST|PUT|DELETE /api/admin/conversations`, `POST /api/admin/topics`, `POST /api/admin/upload`
+- Admin: `POST|PUT|DELETE /api/admin/stories`, `POST|PUT|DELETE /api/admin/lyrics`, `POST|PUT|DELETE /api/admin/conversations`, `PUT /api/admin/{stories|lyrics|conversations}/:id/translations/:lang`, `PUT /api/admin/vocabulary/:topic/:subtopic/words/:wordIndex/translations/:lang`, `POST /api/admin/topics`, `POST /api/admin/upload`

@@ -173,3 +173,20 @@ model VocabularyWord {
 
   @@unique([setId, wordIndex])
 }
+
+// Overlay table for additional-language translations layered on top of the
+// legacy (Spanish) translation columns/JSON above. blockId is "" for an
+// item's own title-level translation, or a block's stable id otherwise.
+model Translation {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  blockId    String   @default("")
+  locale     String
+  text       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([entityType, entityId, blockId, locale])
+  @@index([entityType, entityId])
+}

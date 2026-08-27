@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toConversation, toConversationSummary } from "../lib/serialize.js";
+import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
 
 export const conversationsRouter = Router();
 
@@ -9,6 +10,7 @@ conversationsRouter.get("/", async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
   const topic = asString(req.query.topic);
   const level = asString(req.query.level);
+  const lang = normalizeLang(req.query.lang);
   const where = {
     ...(topic ? { topic } : {}),
     ...(level ? { level } : {})
@@ -32,13 +34,20 @@ conversationsRouter.get("/", async (req, res) => {
     prisma.conversation.count({ where })
   ]);
 
+  const overlay = await fetchTranslationOverlay(
+    "conversation",
+    rows.map((row) => row.id),
+    lang
+  );
+
   res.json({
-    data: rows.map(toConversationSummary),
+    data: rows.map((row) => toConversationSummary(row, lang, overlay.get(row.id))),
     pagination: { page, limit, total }
   });
 });
 
 conversationsRouter.get("/:id", async (req, res) => {
+  const lang = normalizeLang(req.query.lang);
   const conversation = await prisma.conversation.findUnique({
     where: { id: req.params.id }
   });
@@ -48,5 +57,6 @@ conversationsRouter.get("/:id", async (req, res) => {
     return;
   }
 
-  res.json(toConversation(conversation));
+  const overlay = await fetchTranslationOverlay("conversation", [conversation.id], lang);
+  res.json(toConversation(conversation, lang, overlay.get(conversation.id)));
 });

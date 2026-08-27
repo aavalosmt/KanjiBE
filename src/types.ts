@@ -17,6 +17,7 @@ export type ContentBlock = {
   type: BlockType;
   content?: string;
   translation?: string;
+  translationLang?: string;
   url?: string;
   caption?: string;
   speaker?: string;
@@ -30,6 +31,7 @@ export type StorySummary = {
   title: string;
   level: string;
   translation: string | null;
+  translationLang: string;
   coverUrl: string | null;
 };
 
@@ -45,6 +47,7 @@ export type LyricSummary = {
   artist: string;
   level: string | null;
   translation: string | null;
+  translationLang: string;
   coverUrl: string | null;
   youtubeUrl: string | null;
 };
@@ -61,6 +64,7 @@ export type ConversationSummary = {
   topic: string;
   level: string | null;
   translation: string | null;
+  translationLang: string;
   coverUrl: string | null;
 };
 
@@ -174,6 +178,7 @@ export type VocabularyWordEntry = {
   term: string;
   furigana: string;
   translation: string;
+  translationLang: string;
 };
 
 export type VocabularySetSummary = {

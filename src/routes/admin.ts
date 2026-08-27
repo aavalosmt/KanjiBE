@@ -15,11 +15,18 @@ import {
   toStory
 } from "../lib/serialize.js";
 import { unknownTopicMessage } from "../lib/taxonomy.js";
+import {
+  deleteEntityTranslations,
+  LEGACY_LANG,
+  pruneOrphanedBlockTranslations,
+  upsertTranslationOverlay
+} from "../lib/translations.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
   conversationCreateSchema,
   conversationUpdateSchema,
   importSchema,
+  localeParam,
   lyricCreateSchema,
   lyricUpdateSchema,
   normalizeImportPayload,
@@ -27,7 +34,8 @@ import {
   storyCreateSchema,
   storyUpdateSchema,
   subtopicCreateSchema,
-  topicCreateSchema
+  topicCreateSchema,
+  translationOverlaySchema
 } from "../validators.js";
 
 export const adminRouter = Router();
@@ -295,6 +303,7 @@ adminRouter.post("/stories", async (req, res) => {
 
 adminRouter.put("/stories/:id", async (req, res) => {
   const payload = storyUpdateSchema.parse(req.body);
+  const serializedBlocks = payload.blocks ? await persistBlocks(payload.blocks) : undefined;
 
   try {
     const story = await prisma.story.update({
@@ -304,9 +313,13 @@ adminRouter.put("/stories/:id", async (req, res) => {
         level: payload.level,
         translation: payload.translation,
         coverUrl: payload.coverUrl,
-        blocks: payload.blocks ? await persistBlocks(payload.blocks) : undefined
+        blocks: serializedBlocks
       }
     });
+    if (serializedBlocks) {
+      const blockIds = parseBlocks(deserializeBlocks(serializedBlocks)).map((block) => block.id);
+      await pruneOrphanedBlockTranslations("story", story.id, blockIds);
+    }
     res.json(toStory(story));
   } catch (error) {
     if (isNotFound(error)) {
@@ -317,9 +330,44 @@ adminRouter.put("/stories/:id", async (req, res) => {
   }
 });
 
+adminRouter.put("/stories/:id/translations/:lang", async (req, res) => {
+  const lang = localeParam.parse(req.params.lang);
+  if (lang === LEGACY_LANG) {
+    res.status(400).json({
+      error: `Use PUT /stories/:id to edit the original (${LEGACY_LANG}) translation`
+    });
+    return;
+  }
+
+  const payload = translationOverlaySchema.parse(req.body);
+  const story = await prisma.story.findUnique({ where: { id: req.params.id } });
+  if (!story) {
+    res.status(404).json({ error: "Story not found" });
+    return;
+  }
+
+  const blockError = unknownBlockIdsMessage(story.blocks, payload.blocks);
+  if (blockError) {
+    res.status(400).json({ error: blockError });
+    return;
+  }
+
+  await upsertTranslationOverlay({
+    entityType: "story",
+    entityId: story.id,
+    lang,
+    translation: payload.translation,
+    blocks: payload.blocks
+  });
+  res.status(204).send();
+});
+
 adminRouter.delete("/stories/:id", async (req, res) => {
   try {
-    await prisma.story.delete({ where: { id: req.params.id } });
+    await prisma.$transaction([
+      deleteEntityTranslations("story", req.params.id),
+      prisma.story.delete({ where: { id: req.params.id } })
+    ]);
     res.status(204).send();
   } catch (error) {
     if (isNotFound(error)) {
@@ -366,6 +414,12 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
       return;
     }
 
+    const serializedBlocks = payload.blocks
+      ? await persistBlocks(
+          preserveStartTimes(payload.blocks, parseBlocks(deserializeBlocks(existing.blocks)))
+        )
+      : undefined;
+
     const lyric = await prisma.lyric.update({
       where: { id: req.params.id },
       data: {
@@ -375,16 +429,13 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
         translation: payload.translation,
         coverUrl: payload.coverUrl,
         youtubeUrl: payload.youtubeUrl,
-        blocks: payload.blocks
-          ? await persistBlocks(
-              preserveStartTimes(
-                payload.blocks,
-                parseBlocks(deserializeBlocks(existing.blocks))
-              )
-            )
-          : undefined
+        blocks: serializedBlocks
       }
     });
+    if (serializedBlocks) {
+      const blockIds = parseBlocks(deserializeBlocks(serializedBlocks)).map((block) => block.id);
+      await pruneOrphanedBlockTranslations("lyric", lyric.id, blockIds);
+    }
     res.json(toLyric(lyric));
   } catch (error) {
     if (isNotFound(error)) {
@@ -393,6 +444,38 @@ adminRouter.put("/lyrics/:id", async (req, res) => {
     }
     throw error;
   }
+});
+
+adminRouter.put("/lyrics/:id/translations/:lang", async (req, res) => {
+  const lang = localeParam.parse(req.params.lang);
+  if (lang === LEGACY_LANG) {
+    res.status(400).json({
+      error: `Use PUT /lyrics/:id to edit the original (${LEGACY_LANG}) translation`
+    });
+    return;
+  }
+
+  const payload = translationOverlaySchema.parse(req.body);
+  const lyric = await prisma.lyric.findUnique({ where: { id: req.params.id } });
+  if (!lyric) {
+    res.status(404).json({ error: "Lyric not found" });
+    return;
+  }
+
+  const blockError = unknownBlockIdsMessage(lyric.blocks, payload.blocks);
+  if (blockError) {
+    res.status(400).json({ error: blockError });
+    return;
+  }
+
+  await upsertTranslationOverlay({
+    entityType: "lyric",
+    entityId: lyric.id,
+    lang,
+    translation: payload.translation,
+    blocks: payload.blocks
+  });
+  res.status(204).send();
 });
 
 const resyncSchema = z.object({
@@ -428,7 +511,10 @@ adminRouter.post("/lyrics/:id/resync-timestamps", async (req, res) => {
 
 adminRouter.delete("/lyrics/:id", async (req, res) => {
   try {
-    await prisma.lyric.delete({ where: { id: req.params.id } });
+    await prisma.$transaction([
+      deleteEntityTranslations("lyric", req.params.id),
+      prisma.lyric.delete({ where: { id: req.params.id } })
+    ]);
     res.status(204).send();
   } catch (error) {
     if (isNotFound(error)) {
@@ -481,6 +567,8 @@ adminRouter.put("/conversations/:id", async (req, res) => {
     }
   }
 
+  const serializedBlocks = payload.blocks ? await persistBlocks(payload.blocks) : undefined;
+
   try {
     const conversation = await prisma.conversation.update({
       where: { id: req.params.id },
@@ -490,9 +578,13 @@ adminRouter.put("/conversations/:id", async (req, res) => {
         level: payload.level,
         translation: payload.translation,
         coverUrl: payload.coverUrl,
-        blocks: payload.blocks ? await persistBlocks(payload.blocks) : undefined
+        blocks: serializedBlocks
       }
     });
+    if (serializedBlocks) {
+      const blockIds = parseBlocks(deserializeBlocks(serializedBlocks)).map((block) => block.id);
+      await pruneOrphanedBlockTranslations("conversation", conversation.id, blockIds);
+    }
     res.json(toConversation(conversation));
   } catch (error) {
     if (isNotFound(error)) {
@@ -503,9 +595,44 @@ adminRouter.put("/conversations/:id", async (req, res) => {
   }
 });
 
+adminRouter.put("/conversations/:id/translations/:lang", async (req, res) => {
+  const lang = localeParam.parse(req.params.lang);
+  if (lang === LEGACY_LANG) {
+    res.status(400).json({
+      error: `Use PUT /conversations/:id to edit the original (${LEGACY_LANG}) translation`
+    });
+    return;
+  }
+
+  const payload = translationOverlaySchema.parse(req.body);
+  const conversation = await prisma.conversation.findUnique({ where: { id: req.params.id } });
+  if (!conversation) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+
+  const blockError = unknownBlockIdsMessage(conversation.blocks, payload.blocks);
+  if (blockError) {
+    res.status(400).json({ error: blockError });
+    return;
+  }
+
+  await upsertTranslationOverlay({
+    entityType: "conversation",
+    entityId: conversation.id,
+    lang,
+    translation: payload.translation,
+    blocks: payload.blocks
+  });
+  res.status(204).send();
+});
+
 adminRouter.delete("/conversations/:id", async (req, res) => {
   try {
-    await prisma.conversation.delete({ where: { id: req.params.id } });
+    await prisma.$transaction([
+      deleteEntityTranslations("conversation", req.params.id),
+      prisma.conversation.delete({ where: { id: req.params.id } })
+    ]);
     res.status(204).send();
   } catch (error) {
     if (isNotFound(error)) {
@@ -551,6 +678,18 @@ adminRouter.post("/subtopics", async (req, res) => {
     throw error;
   }
 });
+
+function unknownBlockIdsMessage(
+  existingBlocksJson: unknown,
+  blocks: Array<{ id: string }> | undefined
+): string | null {
+  if (!blocks || blocks.length === 0) {
+    return null;
+  }
+  const knownIds = new Set(parseBlocks(deserializeBlocks(existingBlocksJson)).map((block) => block.id));
+  const unknownIds = blocks.map((block) => block.id).filter((id) => !knownIds.has(id));
+  return unknownIds.length ? `Unknown block id(s): ${unknownIds.join(", ")}` : null;
+}
 
 function isNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";

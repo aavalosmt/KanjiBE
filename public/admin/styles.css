@@ -478,7 +478,8 @@ rt {
   gap: 0.35rem;
 }
 
-.view-tab.active {
+.view-tab.active,
+.lang-tab.active {
   background: var(--indigo);
   border-color: var(--indigo);
   color: #f7f1e6;

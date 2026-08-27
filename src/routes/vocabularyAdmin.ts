@@ -12,12 +12,21 @@ import {
 import { VOCABULARY_IMAGE_MIME_TYPES, storeVocabularyImage } from "../lib/vocabularyStorage.js";
 import { unknownSubtopicMessage, unknownTopicMessage } from "../lib/taxonomy.js";
 import { parsePagination } from "../lib/pagination.js";
+import {
+  deleteEntityTranslations,
+  fetchTranslationOverlay,
+  LEGACY_LANG,
+  normalizeLang,
+  upsertTranslationOverlay
+} from "../lib/translations.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
+  localeParam,
   vocabularyEntryPatchSchema,
   vocabularyIngestSchema,
   vocabularySetPatchSchema,
   vocabularyWordPatchSchema,
+  wordTranslationOverlaySchema,
   stripChecksumPrefix
 } from "../validators.js";
 
@@ -91,8 +100,18 @@ vocabularyAdminRouter.post("/ingest", async (req, res) => {
     });
 
     if (payload.content_type === "image") {
-      // Switching an existing set from "list" to "image": drop the now-irrelevant words.
+      // Switching an existing set from "list" to "image": drop the now-irrelevant words
+      // (and any English/etc. overlays layered on top of them).
+      const droppedWords = await tx.vocabularyWord.findMany({
+        where: { setId: set.id },
+        select: { id: true }
+      });
       await tx.vocabularyWord.deleteMany({ where: { setId: set.id } });
+      if (droppedWords.length) {
+        await tx.translation.deleteMany({
+          where: { entityType: "vocabularyWord", entityId: { in: droppedWords.map((w) => w.id) } }
+        });
+      }
 
       for (const page of payload.pages) {
         const imageChecksum = stripChecksumPrefix(page.image_checksum);
@@ -144,7 +163,18 @@ vocabularyAdminRouter.post("/ingest", async (req, res) => {
       // (cascades to their entries).
       await tx.vocabularyPage.deleteMany({ where: { setId: set.id } });
 
+      // Words are fully replaced (new ids) on every ingest, so any overlays on the old
+      // ids would otherwise be orphaned.
+      const droppedWords = await tx.vocabularyWord.findMany({
+        where: { setId: set.id },
+        select: { id: true }
+      });
       await tx.vocabularyWord.deleteMany({ where: { setId: set.id } });
+      if (droppedWords.length) {
+        await tx.translation.deleteMany({
+          where: { entityType: "vocabularyWord", entityId: { in: droppedWords.map((w) => w.id) } }
+        });
+      }
       await tx.vocabularyWord.createMany({
         data: payload.words.map((word, index) => ({
           setId: set.id,
@@ -198,6 +228,7 @@ async function findSet(topic: string, subtopic: string) {
 }
 
 vocabularyAdminRouter.get("/:topic/:subtopic", async (req, res) => {
+  const lang = normalizeLang(req.query.lang);
   const set = await findSet(req.params.topic, req.params.subtopic);
 
   if (!set) {
@@ -205,7 +236,12 @@ vocabularyAdminRouter.get("/:topic/:subtopic", async (req, res) => {
     return;
   }
 
-  res.json(toVocabularySet(set));
+  const overlay = await fetchTranslationOverlay(
+    "vocabularyWord",
+    set.words.map((word) => word.id),
+    lang
+  );
+  res.json(toVocabularySet(set, lang, overlay));
 });
 
 vocabularyAdminRouter.patch("/:topic/:subtopic", async (req, res) => {
@@ -370,6 +406,36 @@ vocabularyAdminRouter.patch("/:topic/:subtopic/words/:wordIndex", async (req, re
   res.json(toVocabularyWord(updated));
 });
 
+vocabularyAdminRouter.put(
+  "/:topic/:subtopic/words/:wordIndex/translations/:lang",
+  async (req, res) => {
+    const lang = localeParam.parse(req.params.lang);
+    if (lang === LEGACY_LANG) {
+      res.status(400).json({
+        error: `Use PATCH /:topic/:subtopic/words/:wordIndex to edit the original (${LEGACY_LANG}) translation`
+      });
+      return;
+    }
+
+    const wordIndex = Number(req.params.wordIndex);
+    const payload = wordTranslationOverlaySchema.parse(req.body);
+
+    const word = await findWord(req.params.topic, req.params.subtopic, wordIndex);
+    if (!word) {
+      res.status(404).json({ error: "Word not found" });
+      return;
+    }
+
+    await upsertTranslationOverlay({
+      entityType: "vocabularyWord",
+      entityId: word.id,
+      lang,
+      translation: payload.translation
+    });
+    res.status(204).send();
+  }
+);
+
 vocabularyAdminRouter.delete("/:topic/:subtopic/words/:wordIndex", async (req, res) => {
   const wordIndex = Number(req.params.wordIndex);
   const word = await findWord(req.params.topic, req.params.subtopic, wordIndex);
@@ -378,7 +444,10 @@ vocabularyAdminRouter.delete("/:topic/:subtopic/words/:wordIndex", async (req, r
     return;
   }
 
-  await prisma.vocabularyWord.delete({ where: { id: word.id } });
+  await prisma.$transaction([
+    deleteEntityTranslations("vocabularyWord", word.id),
+    prisma.vocabularyWord.delete({ where: { id: word.id } })
+  ]);
   res.status(204).send();
 });
 

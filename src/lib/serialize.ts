@@ -10,9 +10,21 @@ import type {
 import { analyzeBlock } from "./kuromoji.js";
 import { preserveStartTimes } from "./timestamps.js";
 import { normalizeBlocks, parseBlocks, type blockSchema } from "../validators.js";
+import { LEGACY_LANG, resolveText, type EntityOverlay } from "./translations.js";
 import type { z } from "zod";
 
 export { preserveStartTimes };
+
+function applyBlockOverlay(
+  blocks: ContentBlock[],
+  lang: string,
+  overlay: EntityOverlay | undefined
+): ContentBlock[] {
+  return blocks.map((block) => {
+    const resolved = resolveText(block.translation, overlay?.get(block.id), lang);
+    return { ...block, translation: resolved.text ?? undefined, translationLang: resolved.lang };
+  });
+}
 
 export async function persistBlocks(
   blocks: z.infer<typeof blockSchema>[]
@@ -104,64 +116,92 @@ type ConversationRecord = {
   updatedAt?: Date;
 };
 
-export function toStorySummary(story: StoryRecord): StorySummary {
+export function toStorySummary(
+  story: StoryRecord,
+  lang: string = LEGACY_LANG,
+  overlay?: EntityOverlay
+): StorySummary {
+  const resolved = resolveText(story.translation, overlay?.get(""), lang);
   return {
     id: story.id,
     title: story.title,
     level: story.level,
-    translation: story.translation,
+    translation: resolved.text,
+    translationLang: resolved.lang,
     coverUrl: story.coverUrl
   };
 }
 
-export function toStory(story: Required<Pick<StoryRecord, "blocks" | "createdAt" | "updatedAt">> & StoryRecord): Story {
+export function toStory(
+  story: Required<Pick<StoryRecord, "blocks" | "createdAt" | "updatedAt">> & StoryRecord,
+  lang: string = LEGACY_LANG,
+  overlay?: EntityOverlay
+): Story {
   return {
-    ...toStorySummary(story),
-    blocks: parseBlocks(deserializeBlocks(story.blocks)),
+    ...toStorySummary(story, lang, overlay),
+    blocks: applyBlockOverlay(parseBlocks(deserializeBlocks(story.blocks)), lang, overlay),
     createdAt: story.createdAt.toISOString(),
     updatedAt: story.updatedAt.toISOString()
   };
 }
 
-export function toLyricSummary(lyric: LyricRecord): LyricSummary {
+export function toLyricSummary(
+  lyric: LyricRecord,
+  lang: string = LEGACY_LANG,
+  overlay?: EntityOverlay
+): LyricSummary {
+  const resolved = resolveText(lyric.translation, overlay?.get(""), lang);
   return {
     id: lyric.id,
     title: lyric.title,
     artist: lyric.artist,
     level: lyric.level ?? null,
-    translation: lyric.translation,
+    translation: resolved.text,
+    translationLang: resolved.lang,
     coverUrl: lyric.coverUrl,
     youtubeUrl: lyric.youtubeUrl ?? null
   };
 }
 
-export function toLyric(lyric: Required<Pick<LyricRecord, "blocks" | "createdAt" | "updatedAt">> & LyricRecord): Lyric {
+export function toLyric(
+  lyric: Required<Pick<LyricRecord, "blocks" | "createdAt" | "updatedAt">> & LyricRecord,
+  lang: string = LEGACY_LANG,
+  overlay?: EntityOverlay
+): Lyric {
   return {
-    ...toLyricSummary(lyric),
-    blocks: parseBlocks(deserializeBlocks(lyric.blocks)),
+    ...toLyricSummary(lyric, lang, overlay),
+    blocks: applyBlockOverlay(parseBlocks(deserializeBlocks(lyric.blocks)), lang, overlay),
     createdAt: lyric.createdAt.toISOString(),
     updatedAt: lyric.updatedAt.toISOString()
   };
 }
 
-export function toConversationSummary(conversation: ConversationRecord): ConversationSummary {
+export function toConversationSummary(
+  conversation: ConversationRecord,
+  lang: string = LEGACY_LANG,
+  overlay?: EntityOverlay
+): ConversationSummary {
+  const resolved = resolveText(conversation.translation, overlay?.get(""), lang);
   return {
     id: conversation.id,
     title: conversation.title,
     topic: conversation.topic,
     level: conversation.level ?? null,
-    translation: conversation.translation,
+    translation: resolved.text,
+    translationLang: resolved.lang,
     coverUrl: conversation.coverUrl
   };
 }
 
 export function toConversation(
   conversation: Required<Pick<ConversationRecord, "blocks" | "createdAt" | "updatedAt">> &
-    ConversationRecord
+    ConversationRecord,
+  lang: string = LEGACY_LANG,
+  overlay?: EntityOverlay
 ): Conversation {
   return {
-    ...toConversationSummary(conversation),
-    blocks: parseBlocks(deserializeBlocks(conversation.blocks)),
+    ...toConversationSummary(conversation, lang, overlay),
+    blocks: applyBlockOverlay(parseBlocks(deserializeBlocks(conversation.blocks)), lang, overlay),
     createdAt: conversation.createdAt.toISOString(),
     updatedAt: conversation.updatedAt.toISOString()
   };

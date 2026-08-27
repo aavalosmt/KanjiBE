@@ -18,6 +18,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 COPY public ./public
+COPY resources ./resources
 RUN npx prisma generate && npm run build
 
 ENV NODE_ENV=production

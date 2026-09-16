@@ -23,6 +23,9 @@ export const config = {
   uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
+  xaiApiKey: process.env.XAI_API_KEY ?? "",
+  xaiModel: process.env.XAI_MODEL ?? "grok-4-fast",
+  aiProvider: process.env.AI_PROVIDER ?? "gemini",
   defaultLang: process.env.DEFAULT_LANG ?? "en"
 };
 

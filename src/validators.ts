@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { sduiNodeSchema } from "./lib/sdui.js";
 import type { ContentBlock } from "./types.js";
 
 const optionalText = z.string().trim().min(1).optional();
@@ -37,7 +38,7 @@ export const blockSchema = z
     url: z.string().trim().min(1).optional(),
     caption: optionalText,
     speaker: optionalText,
-    notes: optionalText,
+    notes: nullableText,
     tokens: z.array(blockTokenSchema).optional(),
     startTime: z.preprocess((value) => {
       if (value === "" || value === undefined) return undefined;
@@ -418,7 +419,9 @@ export const vocabularyIngestSchema = z.discriminatedUnion("content_type", [
 export const vocabularySetPatchSchema = z
   .object({
     title: z.string().trim().min(1).optional(),
-    cover_url: z.string().trim().min(1).nullable().optional()
+    cover_url: z.string().trim().min(1).nullable().optional(),
+    // SDUI layout override. `null` clears it, reverting to the computed heuristic.
+    layout: sduiNodeSchema.nullable().optional()
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required"
@@ -445,3 +448,23 @@ export const vocabularyEntryPatchSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required"
   });
+
+// --- Example sentences (attached to a registered topic/subtopic) ---
+
+export const exampleSentenceInputSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  text: z.string().trim().min(1),
+  furigana: z.string().trim().min(1),
+  translation: z.string().trim().min(1),
+  notes: z.string().trim().min(1).nullable().optional()
+});
+
+export const exampleSentencesBulkSchema = z.object({
+  sentences: z.array(exampleSentenceInputSchema).max(200)
+});
+
+export const exampleSentenceGenerateSchema = z.object({
+  text: z.string().trim().min(1),
+  provider: z.enum(["gemini", "xai"]).optional(),
+  model: z.string().trim().min(1).optional()
+});

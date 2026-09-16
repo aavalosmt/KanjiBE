@@ -1,4 +1,4 @@
-import { enrichLyricLines } from "./gemini.js";
+import { enrichLyrics, resolveProvider, type AiProvider } from "./ai.js";
 import {
   getLrcLibTrack,
   linesFromTrack,
@@ -57,22 +57,23 @@ type BlockInput = z.infer<typeof blockSchema>;
 
 export async function buildSyncedLyricBlocks(
   track: LrcLibTrack,
-  model?: string
+  model?: string,
+  provider: AiProvider = resolveProvider()
 ): Promise<{
   blocks: BlockInput[];
-  usedGemini: boolean;
-  geminiError?: string;
+  usedAi: boolean;
+  aiError?: string;
 }> {
   const lines = linesFromTrack(track);
   if (lines.length === 0) {
     throw new Error("This track has no lyrics");
   }
 
-  const enriched = await enrichLyricLines(lines.map((line) => line.text), model);
+  const enriched = await enrichLyrics(provider, lines.map((line) => line.text), model);
 
   return {
-    usedGemini: enriched.usedGemini,
-    geminiError: enriched.error,
+    usedAi: enriched.used,
+    aiError: enriched.error,
     blocks: lines.map((line, index) => ({
       type: "text" as const,
       content: enriched.lines[index]?.content || line.text,
@@ -88,6 +89,7 @@ export async function importSyncedLyric(input: {
   trackName?: string;
   youtubeUrl?: string | null;
   model?: string;
+  provider?: string;
 }) {
   const track = await getLrcLibTrack(input);
   if (!track) {
@@ -97,15 +99,19 @@ export async function importSyncedLyric(input: {
     throw new Error("Track is instrumental");
   }
 
-  const built = await buildSyncedLyricBlocks(track, input.model);
+  const built = await buildSyncedLyricBlocks(
+    track,
+    input.model,
+    resolveProvider(input.provider)
+  );
   const blocks = await persistBlocks(built.blocks);
   return {
     title: track.trackName,
     artist: track.artistName,
     youtubeUrl: input.youtubeUrl ?? null,
     blocks,
-    usedGemini: built.usedGemini,
-    geminiError: built.geminiError,
+    usedAi: built.usedAi,
+    aiError: built.aiError,
     source: {
       lrclibId: track.id,
       albumName: track.albumName,

@@ -3,7 +3,14 @@ import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
-import { listGeminiModels, parseJapaneseToKanjiBE } from "../lib/gemini.js";
+import {
+  AI_PROVIDERS,
+  isProviderConfigured,
+  listModels,
+  parseJapanese,
+  providerEnvVar,
+  resolveProvider
+} from "../lib/ai.js";
 import { importSyncedLyric, previewSyncedLyric, resyncLyricTimestamps } from "../lib/importSynced.js";
 import { searchLrcLib } from "../lib/lrclib.js";
 import {
@@ -43,13 +50,21 @@ export const adminRouter = Router();
 adminRouter.use(requireAdmin);
 
 adminRouter.get("/session", (_req, res) => {
-  res.json({ ok: true, gemini: Boolean(config.geminiApiKey) });
+  res.json({
+    ok: true,
+    gemini: Boolean(config.geminiApiKey),
+    xai: Boolean(config.xaiApiKey),
+    defaultProvider: resolveProvider()
+  });
 });
+
+const providerSchema = z.enum(AI_PROVIDERS).optional();
 
 const tokenizeSchema = z.object({
   text: z.string().trim().min(1),
   kind: z.enum(["story", "lyric", "conversation", "auto"]).default("auto"),
-  model: z.string().trim().min(1).optional()
+  model: z.string().trim().min(1).optional(),
+  provider: providerSchema
 });
 
 adminRouter.get("/gemini/models", async (_req, res) => {
@@ -58,26 +73,36 @@ adminRouter.get("/gemini/models", async (_req, res) => {
     return;
   }
 
-  const catalog = await listGeminiModels();
+  const catalog = await listModels("gemini");
   res.json(catalog);
+});
+
+adminRouter.get("/ai/models", async (req, res) => {
+  const provider = resolveProvider(
+    typeof req.query.provider === "string" ? req.query.provider : undefined
+  );
+  if (!isProviderConfigured(provider)) {
+    res.status(503).json({ error: `${providerEnvVar(provider)} is not configured` });
+    return;
+  }
+
+  const catalog = await listModels(provider);
+  res.json({ provider, ...catalog });
 });
 
 adminRouter.post("/tokenize", async (req, res) => {
   const payload = tokenizeSchema.parse(req.body);
-  if (!config.geminiApiKey) {
-    res.status(503).json({ error: "GEMINI_API_KEY is not configured" });
+  const provider = resolveProvider(payload.provider);
+  if (!isProviderConfigured(provider)) {
+    res.status(503).json({ error: `${providerEnvVar(provider)} is not configured` });
     return;
   }
 
   try {
-    const data = await parseJapaneseToKanjiBE(
-      payload.text,
-      payload.kind,
-      payload.model
-    );
+    const data = await parseJapanese(provider, payload.text, payload.kind, payload.model);
     res.json(data);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Gemini request failed";
+    const message = error instanceof Error ? error.message : "AI request failed";
     res.status(502).json({ error: message });
   }
 });
@@ -108,7 +133,8 @@ const lrclibImportSchema = z.object({
   artistName: z.string().trim().min(1).optional(),
   trackName: z.string().trim().min(1).optional(),
   youtubeUrl: z.string().trim().nullable().optional(),
-  model: z.string().trim().min(1).optional()
+  model: z.string().trim().min(1).optional(),
+  provider: providerSchema
 });
 
 adminRouter.get("/lrclib/preview", async (req, res) => {
@@ -142,7 +168,12 @@ adminRouter.post("/lrclib/import", async (req, res) => {
         blocks: built.blocks
       }
     });
-    res.status(201).json({ ...toLyric(lyric), source: built.source });
+    res.status(201).json({
+      ...toLyric(lyric),
+      source: built.source,
+      usedAi: built.usedAi,
+      aiError: built.aiError
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Import failed";
     res.status(502).json({ error: message });

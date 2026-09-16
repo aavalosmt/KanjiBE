@@ -61,7 +61,9 @@ iOS / panel admin
 | --- | --- |
 | `src/index.ts` | Arranque, crea dirs, escucha `PORT` |
 | `src/app.ts` | App Express (también la usan los tests) |
-| `src/config.ts` | Env: `DATABASE_URL`, `ADMIN_API_KEY`, `PUBLIC_BASE_URL`, `CORS_ORIGIN`, `UPLOAD_DIR` |
+| `src/config.ts` | Env: `DATABASE_URL`, `ADMIN_API_KEY`, `PUBLIC_BASE_URL`, `CORS_ORIGIN`, `UPLOAD_DIR`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `XAI_API_KEY`, `XAI_MODEL`, `AI_PROVIDER` |
+| `src/lib/ai.ts` | Selector de proveedor (Gemini / xAI-Grok) para tokenizar y traducir |
+| `src/routes/examples.ts` / `src/routes/exampleSentencesAdmin.ts` | Oraciones de ejemplo por topic/subtopic (base inglés, overlays, generación con IA) |
 | `src/routes/stories.ts` | Listado paginado + detalle |
 | `src/routes/lyrics.ts` | Igual, sin filtro de nivel |
 | `src/routes/admin.ts` | POST/PUT/DELETE de stories y lyrics |
@@ -181,6 +183,9 @@ Después de pushear este cambio:
    | `DATABASE_URL` | `file:./data/kanji.db` |
    | `UPLOAD_DIR` | `/app/data/uploads` |
    | `NODE_ENV` | `production` |
+   | `GEMINI_API_KEY` | opcional; habilita tokenizar/traducir con Gemini |
+   | `XAI_API_KEY` | opcional; habilita tokenizar/traducir con Grok (xAI) |
+   | `AI_PROVIDER` | opcional; `gemini` (default) o `xai` |
 
    No pongas `PORT`. Railway lo define y la app lo lee.
 

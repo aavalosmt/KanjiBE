@@ -290,6 +290,28 @@ describe("admin stories", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("accepts null for a block's notes but still rejects an empty string", async () => {
+    const withNullNotes = await request(app)
+      .post("/api/admin/stories")
+      .set(admin)
+      .send({
+        ...storyPayload,
+        blocks: [{ ...storyPayload.blocks[0], notes: null }]
+      });
+    expect(withNullNotes.status).toBe(201);
+    expect(withNullNotes.body.blocks[0].notes).toBeUndefined();
+
+    const withEmptyNotes = await request(app)
+      .post("/api/admin/stories")
+      .set(admin)
+      .send({
+        ...storyPayload,
+        id: "story-empty-notes",
+        blocks: [{ ...storyPayload.blocks[0], notes: "" }]
+      });
+    expect(withEmptyNotes.status).toBe(400);
+  });
+
   it("validates block payloads", async () => {
     const res = await request(app)
       .post("/api/admin/stories")
@@ -517,6 +539,40 @@ describe("admin tokenize", () => {
   it("lists preferred models only when Gemini is not configured", async () => {
     const res = await request(app).get("/api/admin/gemini/models").set(admin);
     expect(res.status).toBe(503);
+  });
+
+  it("returns 503 for provider=xai when XAI_API_KEY is not configured", async () => {
+    const res = await request(app)
+      .post("/api/admin/tokenize")
+      .set(admin)
+      .send({ text: "家族", kind: "story", provider: "xai" });
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/XAI_API_KEY/);
+  });
+
+  it("rejects an unknown provider", async () => {
+    const res = await request(app)
+      .post("/api/admin/tokenize")
+      .set(admin)
+      .send({ text: "家族", kind: "story", provider: "openai" });
+    expect(res.status).toBe(400);
+  });
+
+  it("GET /api/admin/ai/models 503s for each unconfigured provider", async () => {
+    const gemini = await request(app)
+      .get("/api/admin/ai/models?provider=gemini")
+      .set(admin);
+    expect(gemini.status).toBe(503);
+    expect(gemini.body.error).toMatch(/GEMINI_API_KEY/);
+
+    const xai = await request(app).get("/api/admin/ai/models?provider=xai").set(admin);
+    expect(xai.status).toBe(503);
+    expect(xai.body.error).toMatch(/XAI_API_KEY/);
+  });
+
+  it("reports provider availability on the session endpoint", async () => {
+    const res = await request(app).get("/api/admin/session").set(admin);
+    expect(res.body).toMatchObject({ gemini: false, xai: false, defaultProvider: "gemini" });
   });
 });
 

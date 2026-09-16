@@ -5,6 +5,7 @@ import type {
   VocabularyWord as VocabularyWordRow
 } from "@prisma/client";
 import type {
+  ExampleSentence,
   VocabularyContentType,
   VocabularyEntry,
   VocabularyPage,
@@ -12,6 +13,7 @@ import type {
   VocabularySetSummary,
   VocabularyWordEntry
 } from "../types.js";
+import { resolveLayout } from "./sdui.js";
 import { LEGACY_LANG, resolveText, type EntityOverlay, type TranslationOverlay } from "./translations.js";
 
 function parseJsonArray<T>(value: string): T[] {
@@ -84,19 +86,26 @@ export function toVocabularySet(
     words: VocabularyWordRow[];
   },
   lang: string = LEGACY_LANG,
-  wordOverlay?: TranslationOverlay
+  wordOverlay?: TranslationOverlay,
+  exampleSentences: ExampleSentence[] = []
 ): VocabularySet {
+  const contentType = row.contentType as VocabularyContentType;
+  const pages = row.pages.map(toVocabularyPage);
+  const words = row.words.map((word) => toVocabularyWord(word, lang, wordOverlay?.get(word.id)));
+
   return {
     id: row.id,
     topic: row.topic,
     subtopic: row.subtopic,
-    content_type: row.contentType as VocabularyContentType,
+    content_type: contentType,
     title: row.title,
     cover_url: row.coverUrl,
-    item_count: row.contentType === "list" ? row.words.length : row.pages.length,
+    item_count: contentType === "list" ? words.length : pages.length,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
-    pages: row.pages.map(toVocabularyPage),
-    words: row.words.map((word) => toVocabularyWord(word, lang, wordOverlay?.get(word.id)))
+    pages,
+    words,
+    example_sentences: exampleSentences,
+    layout: resolveLayout(row, { contentType, words, pages, exampleSentences })
   };
 }

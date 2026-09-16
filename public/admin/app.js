@@ -419,35 +419,98 @@ function coverMarkup(url) {
   return `<img class="cover" src="${escapeHtml(url)}" alt="" />`;
 }
 
-function bindGeminiModelSelect() {
+const AI_PROVIDER_LABELS = { gemini: "Gemini", xai: "Grok" };
+
+function currentAiProvider() {
+  return (
+    document.querySelector("#tokenize-provider")?.value ||
+    localStorage.getItem("kanjibe.aiProvider") ||
+    "gemini"
+  );
+}
+
+function currentAiModel() {
+  const provider = currentAiProvider();
+  return (
+    document.querySelector("#tokenize-model")?.value ||
+    localStorage.getItem(`kanjibe.model.${provider}`) ||
+    undefined
+  );
+}
+
+async function bindAiModelSelect() {
+  const providerSelect = document.querySelector("#tokenize-provider");
   const modelSelect = document.querySelector("#tokenize-model");
   if (!modelSelect) return;
-  const storedModel = localStorage.getItem("kanjibe.geminiModel");
-  void api("/api/admin/gemini/models")
-    .then((catalog) => {
-      const current = storedModel || catalog.default || "gemini-3.5-flash";
-      modelSelect.replaceChildren();
-      for (const id of catalog.models) {
-        const option = document.createElement("option");
-        option.value = id;
-        option.textContent = id;
-        if (id === current) option.selected = true;
-        modelSelect.append(option);
-      }
-      if (current && ![...modelSelect.options].some((item) => item.value === current)) {
-        const option = document.createElement("option");
-        option.value = current;
-        option.textContent = current;
-        option.selected = true;
-        modelSelect.prepend(option);
-      }
-    })
-    .catch(() => {
-      if (storedModel) modelSelect.value = storedModel;
-    });
+
+  let available = ["gemini"];
+  let defaultProvider = "gemini";
+  try {
+    const session = await api("/api/admin/session");
+    available = [
+      ...(session.gemini ? ["gemini"] : []),
+      ...(session.xai ? ["xai"] : [])
+    ];
+    if (available.length === 0) available = ["gemini"];
+    defaultProvider = available.includes(session.defaultProvider)
+      ? session.defaultProvider
+      : available[0];
+  } catch {
+    /* keep defaults */
+  }
+
+  const storedProvider = localStorage.getItem("kanjibe.aiProvider");
+  let provider = available.includes(storedProvider) ? storedProvider : defaultProvider;
+
+  if (providerSelect) {
+    providerSelect.replaceChildren();
+    for (const id of available) {
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = AI_PROVIDER_LABELS[id] ?? id;
+      if (id === provider) option.selected = true;
+      providerSelect.append(option);
+    }
+    const wrap = providerSelect.closest("label") ?? providerSelect;
+    wrap.style.display = available.length < 2 ? "none" : "";
+  }
+
+  async function loadModels() {
+    localStorage.setItem("kanjibe.aiProvider", provider);
+    const storedModel = localStorage.getItem(`kanjibe.model.${provider}`);
+    let catalog = { models: [], default: "" };
+    try {
+      catalog = await api(`/api/admin/ai/models?provider=${provider}`);
+    } catch {
+      /* unconfigured / offline: fall back to whatever is stored */
+    }
+    const current = storedModel || catalog.default || catalog.models[0] || "";
+    modelSelect.replaceChildren();
+    for (const id of catalog.models) {
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = id;
+      if (id === current) option.selected = true;
+      modelSelect.append(option);
+    }
+    if (current && ![...modelSelect.options].some((item) => item.value === current)) {
+      const option = document.createElement("option");
+      option.value = current;
+      option.textContent = current;
+      option.selected = true;
+      modelSelect.prepend(option);
+    }
+  }
+
   modelSelect.addEventListener("change", () => {
-    localStorage.setItem("kanjibe.geminiModel", modelSelect.value);
+    localStorage.setItem(`kanjibe.model.${provider}`, modelSelect.value);
   });
+  providerSelect?.addEventListener("change", () => {
+    provider = providerSelect.value;
+    void loadModels();
+  });
+
+  await loadModels();
 }
 
 function formatTime(seconds) {
@@ -507,13 +570,14 @@ async function showLrcPreview(id, host) {
           body: JSON.stringify({
             id: preview.id,
             youtubeUrl,
-            model: localStorage.getItem("kanjibe.geminiModel") || "gemini-3.5-flash"
+            provider: currentAiProvider(),
+            model: currentAiModel()
           })
         });
-        if (created.usedGemini) {
+        if (created.usedAi) {
           toast("Guardada con furigana y traducción", "ok");
         } else {
-          toast(created.geminiError || "Guardada sin Gemini (sin traducción)", "error");
+          toast(created.aiError || "Guardada sin traducción de IA", "error");
         }
         go(`/lyrics/${created.id}`);
       } catch (error) {
@@ -1644,9 +1708,9 @@ function renderImport() {
         </div>
       </div>
       <section class="editor pad import-panel">
-        <div class="kicker">Gemini</div>
+        <div class="kicker">IA</div>
         <h2>Tokenizar texto crudo</h2>
-        <p class="muted">Pega el cuento, la letra o el diálogo en japonés. Gemini lo convierte al JSON de KanjiBE y lo deja abajo para que lo revises e importes.</p>
+        <p class="muted">Pega el cuento, la letra o el diálogo en japonés. La IA lo convierte al JSON de KanjiBE y lo deja abajo para que lo revises e importes.</p>
         <div class="meta-grid">
           <label class="field">
             <span>Tipo</span>
@@ -1658,7 +1722,13 @@ function renderImport() {
             </select>
           </label>
           <label class="field">
-            <span>Modelo Gemini</span>
+            <span>Proveedor</span>
+            <select id="tokenize-provider">
+              <option value="gemini">Gemini</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Modelo</span>
             <select id="tokenize-model">
               <option value="gemini-3.5-flash">gemini-3.5-flash</option>
               <option value="gemini-3.6-flash">gemini-3.6-flash</option>
@@ -1671,7 +1741,7 @@ function renderImport() {
           <textarea id="raw-jp" class="jp import-json" lang="ja" spellcheck="false" placeholder="飛翔たいたら…"></textarea>
         </label>
         <div class="actions">
-          <button class="primary" id="run-tokenize" type="button">Tokenizar con Gemini</button>
+          <button class="primary" id="run-tokenize" type="button">Tokenizar</button>
         </div>
       </section>
       <section class="editor pad import-panel import-panel-json">
@@ -1698,7 +1768,7 @@ function renderImport() {
   document.querySelectorAll(".import-panel").forEach((panel) => enablePlainPaste(panel));
 
   const textarea = document.querySelector("#import-json");
-  bindGeminiModelSelect();
+  void bindAiModelSelect();
 
   document.querySelector("#run-tokenize").addEventListener("click", async () => {
     const text = document.querySelector("#raw-jp").value.trim();
@@ -1711,12 +1781,14 @@ function renderImport() {
     button.textContent = "Tokenizando…";
     try {
       const kind = document.querySelector("#tokenize-kind").value;
-      const model =
-        document.querySelector("#tokenize-model")?.value || "gemini-3.5-flash";
-      localStorage.setItem("kanjibe.geminiModel", model);
       const data = await api("/api/admin/tokenize", {
         method: "POST",
-        body: JSON.stringify({ text, kind, model })
+        body: JSON.stringify({
+          text,
+          kind,
+          provider: currentAiProvider(),
+          model: currentAiModel()
+        })
       });
       textarea.value = JSON.stringify(data, null, 2);
       toast("JSON listo. Revísalo e importa.", "ok");
@@ -1724,7 +1796,7 @@ function renderImport() {
       toast(error.message, "error");
     } finally {
       button.disabled = false;
-      button.textContent = "Tokenizar con Gemini";
+      button.textContent = "Tokenizar";
     }
   });
   document.querySelector("#load-example").addEventListener("click", () => {
@@ -2258,10 +2330,14 @@ function renderVocabularyWordList(set) {
         </div>
       </div>
       <div class="grid">${rows}</div>
+      <div id="example-sentences-host"></div>
+      ${layoutPanelHtml(set)}
     `
   );
   bindLogout();
   bindVocabularyWordList(set);
+  void mountExampleSentences(set.topic, set.subtopic);
+  bindLayoutPanel(set);
 }
 
 function bindVocabularyWordList(set) {
@@ -2330,6 +2406,276 @@ function bindVocabularyWordList(set) {
   });
 }
 
+let exampleLang = "en";
+
+function exampleSentenceRow(sentence) {
+  const base = exampleLang === "en";
+  const lock = base ? "" : "disabled";
+  const indexAttr =
+    sentence.sentence_index != null ? ` data-sentence-index="${sentence.sentence_index}"` : "";
+  const idAttr = sentence.id ? ` data-id="${escapeHtml(sentence.id)}"` : "";
+  return `
+    <div class="block example-sentence"${indexAttr}${idAttr}>
+      <div class="block-head">
+        <b>Oración</b>
+        ${base ? `<button class="danger tiny" data-del type="button">Quitar</button>` : ""}
+      </div>
+      <label class="field">
+        <span>Japonés</span>
+        <input class="jp" data-field="text" value="${escapeHtml(sentence.text || "")}" ${lock} />
+      </label>
+      <label class="field">
+        <span>Furigana</span>
+        <input class="jp" data-field="furigana" value="${escapeHtml(sentence.furigana || "")}" ${lock} />
+      </label>
+      <div class="manga-furigana-preview" data-preview></div>
+      <label class="field">
+        <span>Traducción (${base ? "EN" : exampleLang.toUpperCase()})</span>
+        <input data-field="translation" value="${escapeHtml(sentence.translation || "")}" />
+      </label>
+      ${
+        base
+          ? `<label class="field"><span>Nota (opcional)</span><input data-field="notes" value="${escapeHtml(sentence.notes || "")}" /></label>`
+          : ""
+      }
+    </div>`;
+}
+
+function bindExampleRow(row) {
+  const preview = row.querySelector("[data-preview]");
+  const furiganaField = row.querySelector('[data-field="furigana"]');
+  if (preview && furiganaField) {
+    const update = () => preview.replaceChildren(renderFurigana(furiganaField.value));
+    update();
+    furiganaField.addEventListener("input", update);
+  }
+  row.querySelector("[data-del]")?.addEventListener("click", () => row.remove());
+}
+
+function collectExampleRows(host) {
+  return [...host.querySelectorAll(".example-sentence")].map((row) => {
+    const val = (field) => row.querySelector(`[data-field="${field}"]`)?.value.trim() ?? "";
+    const out = { text: val("text"), furigana: val("furigana"), translation: val("translation") };
+    if (row.dataset.id) out.id = row.dataset.id;
+    const notes = val("notes");
+    if (notes) out.notes = notes;
+    return out;
+  });
+}
+
+function renderExampleSentences(host, topic, subtopic, rows) {
+  const base = exampleLang === "en";
+  const rowsHtml = rows.length
+    ? rows.map(exampleSentenceRow).join("")
+    : `<p class="muted">Sin oraciones todavía.</p>`;
+  host.innerHTML = `
+    <section class="editor pad">
+      <div class="row">
+        <div>
+          <div class="kicker">Ejemplos</div>
+          <h2>Oraciones de ejemplo</h2>
+          <p class="muted">Se sirven en <code>GET /api/examples/${escapeHtml(topic)}/${escapeHtml(subtopic)}</code> y dentro del set de vocabulario.</p>
+        </div>
+        <div class="view-toggle" role="tablist">
+          <button class="tiny lang-tab-ex ${base ? "active" : ""}" data-lang="en" type="button">EN (base)</button>
+          <button class="tiny lang-tab-ex ${base ? "" : "active"}" data-lang="es" type="button">ES</button>
+        </div>
+      </div>
+      <div id="example-rows">${rowsHtml}</div>
+      ${
+        base
+          ? `
+      <div class="actions">
+        <button class="ghost" id="ex-add" type="button">+ Añadir oración</button>
+        <button class="primary" id="ex-save" type="button">Guardar ejemplos</button>
+      </div>
+      <div class="editor pad" style="margin-top:1rem">
+        <div class="kicker">IA</div>
+        <p class="muted">Pega oraciones en japonés (una por línea). La IA añade furigana y traducción al inglés para que las revises.</p>
+        <div class="meta-grid">
+          <label class="field"><span>Proveedor</span><select id="tokenize-provider"><option value="gemini">Gemini</option></select></label>
+          <label class="field"><span>Modelo</span><select id="tokenize-model"></select></label>
+        </div>
+        <label class="field"><span>Oraciones</span><textarea id="ex-ai-text" class="jp" lang="ja" spellcheck="false" placeholder="指が痛い"></textarea></label>
+        <div class="actions"><button class="primary" id="ex-ai-run" type="button">Generar con IA</button></div>
+      </div>`
+          : `
+      <div class="actions">
+        <button class="primary" id="ex-save-tr" type="button">Guardar traducciones ${exampleLang.toUpperCase()}</button>
+      </div>`
+      }
+    </section>`;
+  bindExampleSentences(host, topic, subtopic);
+}
+
+function bindExampleSentences(host, topic, subtopic) {
+  const apiBase = `/api/admin/examples/${encodeURIComponent(topic)}/${encodeURIComponent(subtopic)}`;
+
+  host.querySelectorAll(".lang-tab-ex").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      if (tab.dataset.lang === exampleLang) return;
+      exampleLang = tab.dataset.lang;
+      void mountExampleSentences(topic, subtopic);
+    });
+  });
+
+  host.querySelectorAll(".example-sentence").forEach(bindExampleRow);
+
+  host.querySelector("#ex-add")?.addEventListener("click", () => {
+    const rowsHost = host.querySelector("#example-rows");
+    rowsHost.querySelector("p.muted")?.remove();
+    const wrap = document.createElement("div");
+    wrap.innerHTML = exampleSentenceRow({});
+    const row = wrap.firstElementChild;
+    rowsHost.append(row);
+    bindExampleRow(row);
+  });
+
+  host.querySelector("#ex-save")?.addEventListener("click", async () => {
+    const sentences = collectExampleRows(host);
+    if (sentences.some((s) => !s.text || !s.furigana || !s.translation)) {
+      toast("Cada oración necesita japonés, furigana y traducción", "error");
+      return;
+    }
+    const button = host.querySelector("#ex-save");
+    button.disabled = true;
+    try {
+      await api(apiBase, { method: "PUT", body: JSON.stringify({ sentences }) });
+      toast("Ejemplos guardados", "ok");
+      await mountExampleSentences(topic, subtopic);
+    } catch (error) {
+      toast(error.message, "error");
+      button.disabled = false;
+    }
+  });
+
+  host.querySelector("#ex-save-tr")?.addEventListener("click", async () => {
+    const button = host.querySelector("#ex-save-tr");
+    button.disabled = true;
+    try {
+      for (const row of host.querySelectorAll(".example-sentence")) {
+        const index = row.dataset.sentenceIndex;
+        const translation = row.querySelector('[data-field="translation"]').value.trim();
+        if (index == null || !translation) continue;
+        await api(`${apiBase}/${index}/translations/${exampleLang}`, {
+          method: "PUT",
+          body: JSON.stringify({ translation })
+        });
+      }
+      toast("Traducciones guardadas", "ok");
+      await mountExampleSentences(topic, subtopic);
+    } catch (error) {
+      toast(error.message, "error");
+      button.disabled = false;
+    }
+  });
+
+  if (host.querySelector("#tokenize-provider")) void bindAiModelSelect();
+
+  host.querySelector("#ex-ai-run")?.addEventListener("click", async () => {
+    const text = host.querySelector("#ex-ai-text").value.trim();
+    if (!text) {
+      toast("Pega al menos una oración", "error");
+      return;
+    }
+    const button = host.querySelector("#ex-ai-run");
+    button.disabled = true;
+    button.textContent = "Generando…";
+    try {
+      const result = await api(`${apiBase}/generate`, {
+        method: "POST",
+        body: JSON.stringify({ text, provider: currentAiProvider(), model: currentAiModel() })
+      });
+      const rowsHost = host.querySelector("#example-rows");
+      rowsHost.querySelector("p.muted")?.remove();
+      for (const sentence of result.sentences) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = exampleSentenceRow(sentence);
+        const row = wrap.firstElementChild;
+        rowsHost.append(row);
+        bindExampleRow(row);
+      }
+      host.querySelector("#ex-ai-text").value = "";
+      toast(
+        result.usedAi ? "Oraciones generadas. Revísalas y guarda." : result.aiError || "La IA no devolvió traducciones",
+        result.usedAi ? "ok" : "error"
+      );
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Generar con IA";
+    }
+  });
+}
+
+async function mountExampleSentences(topic, subtopic) {
+  const host = document.querySelector("#example-sentences-host");
+  if (!host) return;
+  try {
+    const res = await api(
+      `/api/admin/examples/${encodeURIComponent(topic)}/${encodeURIComponent(subtopic)}?lang=${exampleLang}`
+    );
+    renderExampleSentences(host, topic, subtopic, res.data);
+  } catch (error) {
+    host.innerHTML = `<section class="editor pad"><p class="muted">No se pudieron cargar los ejemplos: ${escapeHtml(error.message)}</p></section>`;
+  }
+}
+
+function layoutPanelHtml(set) {
+  const pretty = JSON.stringify(set.layout, null, 2);
+  return `
+    <section class="editor pad" id="layout-panel">
+      <div class="kicker">Diseño (SDUI)</div>
+      <h2>Diseño de esta pantalla</h2>
+      <p class="muted">Describe cómo debe renderizarse este set (columnas, tabla, colapsable, carrusel). Se calcula automáticamente a partir del contenido; puedes sobreescribirlo editando el JSON.</p>
+      <label class="field">
+        <span>layout</span>
+        <textarea id="layout-json" class="import-json" spellcheck="false" rows="14">${escapeHtml(pretty)}</textarea>
+      </label>
+      <div class="actions">
+        <button class="primary" id="layout-save" type="button">Guardar diseño</button>
+        <button class="ghost" id="layout-auto" type="button">Usar automático</button>
+      </div>
+    </section>`;
+}
+
+function bindLayoutPanel(set) {
+  const apiPath = vocabularySetApiPath(set.topic, set.subtopic);
+
+  document.querySelector("#layout-save")?.addEventListener("click", async () => {
+    const textarea = document.querySelector("#layout-json");
+    let parsedLayout;
+    try {
+      parsedLayout = JSON.parse(textarea.value);
+    } catch (error) {
+      toast(`JSON inválido: ${error.message}`, "error");
+      return;
+    }
+    const button = document.querySelector("#layout-save");
+    button.disabled = true;
+    try {
+      await api(apiPath, { method: "PATCH", body: JSON.stringify({ layout: parsedLayout }) });
+      toast("Diseño guardado", "ok");
+      await route();
+    } catch (error) {
+      toast(error.message, "error");
+      button.disabled = false;
+    }
+  });
+
+  document.querySelector("#layout-auto")?.addEventListener("click", async () => {
+    if (!confirm("¿Volver al diseño automático? Se perderá la personalización guardada.")) return;
+    try {
+      await api(apiPath, { method: "PATCH", body: JSON.stringify({ layout: null }) });
+      toast("Diseño automático restablecido", "ok");
+      await route();
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  });
+}
+
 function renderVocabularySet(set) {
   if (set.content_type === "list") {
     renderVocabularyWordList(set);
@@ -2352,9 +2698,13 @@ function renderVocabularySet(set) {
         </div>
       </div>
       <div class="grid">${cards}</div>
+      <div id="example-sentences-host"></div>
+      ${layoutPanelHtml(set)}
     `
   );
   bindLogout();
+  void mountExampleSentences(set.topic, set.subtopic);
+  bindLayoutPanel(set);
 
   app.querySelectorAll("[data-del-page]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -2676,12 +3026,18 @@ async function route() {
           <div>
             <div class="kicker">LRCLib</div>
             <h1>Buscar canción</h1>
-            <p class="muted">Revisa la letra y el idioma antes de guardar. Gemini usa el modelo global del panel (3.5 Flash por defecto).</p>
+            <p class="muted">Revisa la letra y el idioma antes de guardar. La IA usa el proveedor y modelo elegidos aquí.</p>
           </div>
         </div>
         <section class="editor pad search-panel">
           <label class="field">
-            <span>Modelo Gemini</span>
+            <span>Proveedor</span>
+            <select id="tokenize-provider">
+              <option value="gemini">Gemini</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Modelo</span>
             <select id="tokenize-model">
               <option value="gemini-3.5-flash">gemini-3.5-flash</option>
               <option value="gemini-3.6-flash">gemini-3.6-flash</option>
@@ -2700,7 +3056,7 @@ async function route() {
       `
       );
       bindLogout();
-      bindGeminiModelSelect();
+      void bindAiModelSelect();
       bindLrcLibSearch();
       return;
     }

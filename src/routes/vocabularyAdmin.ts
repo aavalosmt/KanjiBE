@@ -9,6 +9,7 @@ import {
   toVocabularySetSummary,
   toVocabularyWord
 } from "../lib/vocabularySerialize.js";
+import { listExampleSentences } from "../lib/exampleSentenceSerialize.js";
 import { VOCABULARY_IMAGE_MIME_TYPES, storeVocabularyImage } from "../lib/vocabularyStorage.js";
 import { unknownSubtopicMessage, unknownTopicMessage } from "../lib/taxonomy.js";
 import { parsePagination } from "../lib/pagination.js";
@@ -236,27 +237,45 @@ vocabularyAdminRouter.get("/:topic/:subtopic", async (req, res) => {
     return;
   }
 
-  const overlay = await fetchTranslationOverlay(
-    "vocabularyWord",
-    set.words.map((word) => word.id),
-    lang
-  );
-  res.json(toVocabularySet(set, lang, overlay));
+  const [overlay, exampleSentences] = await Promise.all([
+    fetchTranslationOverlay(
+      "vocabularyWord",
+      set.words.map((word) => word.id),
+      lang
+    ),
+    listExampleSentences(req.params.topic, req.params.subtopic, lang)
+  ]);
+  res.json(toVocabularySet(set, lang, overlay, exampleSentences));
 });
 
 vocabularyAdminRouter.patch("/:topic/:subtopic", async (req, res) => {
   const payload = vocabularySetPatchSchema.parse(req.body);
 
   try {
+    // undefined = field omitted, leave untouched; null = clear the override
+    // (revert to the computed heuristic); an object = store the override.
+    const layout =
+      payload.layout === undefined
+        ? undefined
+        : payload.layout === null
+          ? null
+          : JSON.stringify(payload.layout);
+
     await prisma.vocabularySet.update({
       where: { topic_subtopic: { topic: req.params.topic, subtopic: req.params.subtopic } },
       data: {
         title: payload.title,
-        coverUrl: payload.cover_url
+        coverUrl: payload.cover_url,
+        layout
       }
     });
     const set = await findSet(req.params.topic, req.params.subtopic);
-    res.json(toVocabularySet(set!));
+    const exampleSentences = await listExampleSentences(
+      req.params.topic,
+      req.params.subtopic,
+      LEGACY_LANG
+    );
+    res.json(toVocabularySet(set!, LEGACY_LANG, undefined, exampleSentences));
   } catch (error) {
     if (isNotFound(error)) {
       res.status(404).json({ error: "Vocabulary set not found" });

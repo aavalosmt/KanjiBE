@@ -1,9 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { config } from "../config.js";
-import { importSchema, normalizeImportPayload } from "../validators.js";
-import type { z } from "zod";
-
-type ImportPayload = z.infer<typeof importSchema>;
+import {
+  LINE_ENRICH_INSTRUCTION,
+  SYSTEM_INSTRUCTION,
+  finalizeImportPayload,
+  stripLineBreaks,
+  type EnrichedLyricLine
+} from "./aiShared.js";
 
 const blockSchema = {
   type: Type.OBJECT,
@@ -97,52 +100,6 @@ const responseSchema = {
   required: ["stories", "lyrics", "conversations"]
 };
 
-const SYSTEM_INSTRUCTION = `Eres el motor de tokenización lingüística para KanjiBE.
-Segmenta el japonés en unidades léxicas y gramaticales COMPLETAS (palabra + conjugación), no en kanjis sueltos.
-
-Cada token visual es UN enlace markdown: [superficieCompleta](furigana:lecturas.con.puntos)
-La superficie DENTRO de [] incluye kanji + okurigana + conjugación de ESA palabra.
-Las partículas (は が を に で と の も へ) y el kana que no es parte de esa palabra quedan FUERA, como texto plano.
-
-REGLAS (CRÍTICO):
-
-1. JUKUGO — un compuesto = un token. Nunca un kanji por enlace.
-   INCORRECTO: [飛](furigana:ひ)[翔](furigana:しょう)
-   CORRECTO:   [飛翔](furigana:ひ.しょう)
-   INCORRECTO: [飛](furigana:ひ)[行](furigana:こう)[機](furigana:き)
-   CORRECTO:   [飛行機](furigana:ひ.こう.き)
-   INCORRECTO: [未](furigana:み)[知](furigana:ち)
-   CORRECTO:   [未知](furigana:み.ち)
-   INCORRECTO: [世](furigana:せ)[界](furigana:かい)
-   CORRECTO:   [世界](furigana:せ.かい)
-
-2. CONJUGACIÓN / OKURIGANA — van DENTRO del mismo token, no sueltas después.
-   INCORRECTO: [掴](furigana:つか)め
-   CORRECTO:   [掴め](furigana:つか.め)
-   INCORRECTO: [知](furigana:し)らない
-   CORRECTO:   [知らない](furigana:し.ら.な.い)
-   INCORRECTO: [出](furigana:で)来ない
-   CORRECTO:   [出来ない](furigana:で.き.な.い)
-   INCORRECTO: [目指](furigana:め.ざ)した
-   CORRECTO:   [目指した](furigana:め.ざ.し.た)
-   INCORRECTO: [食](furigana:た)べる
-   CORRECTO:   [食べる](furigana:た.べる)
-
-3. FRASES FUNCIONALES — no las fusiones en un solo token, pero cada pieza es una PALABRA completa:
-   "できないことがある" → [出来ない](furigana:で.き.な.い)ことが ある
-   (verbo potencial negativo + こと + が + ある). Nunca [出](furigana:で)だけ.
-
-4. Lecturas: un segmento por kanji, separados por punto, en orden. Jukujikun sin puntos: [今日](furigana:きょう).
-
-5. No anotes kana suelto ni puntuación. Un bloque text = una línea original. Header = estribillo/verso.
-
-6. CERO saltos de línea, \\n o <br> en content/title/translation/caption. Varias líneas del original = varios bloques.
-
-7. Traducción al español de la línea (no de cada kanji).
-8. kind=story → solo stories. kind=lyric → solo lyrics. kind=conversation → solo conversations. auto → decide.
-9. No inventes ids, coverUrl, youtubeUrl ni imágenes. youtubeUrl solo si el texto trae un link de YouTube; si no, null.
-10. kind=conversation: cada línea de diálogo es un bloque type=dialogue con "speaker" (quién habla, ej. "Empleado", "Cliente") y "content" con esa línea en japonés con furigana. topic es un slug corto en snake_case que describe el escenario (ej. convenience_store, immigration_interview). Usa type=text/header solo para narración o acotaciones de escena, nunca para diálogo.`;
-
 export const PREFERRED_GEMINI_MODELS = [
   "gemini-3.5-flash",
   "gemini-3.6-flash",
@@ -213,7 +170,8 @@ const lyricLineSchema = {
     },
     translation: {
       type: Type.STRING,
-      description: "Spanish translation of this exact line. Required, never empty."
+      description:
+        "Translation of this exact line into the target language named in the system prompt. Required, never empty."
     }
   },
   required: ["index", "content", "translation"]
@@ -227,29 +185,17 @@ const lyricLinesResponseSchema = {
   required: ["lines"]
 };
 
-const LINE_ENRICH_INSTRUCTION = `${SYSTEM_INSTRUCTION}
-
-Además: cada objeto en lines es UNA línea de la letra.
-- index es el número de esa línea.
-- content es esa línea con furigana.
-- translation es la traducción al español de ESA línea. Obligatoria.
-- No omitas líneas. No fusiones dos líneas.`;
-
-export type EnrichedLyricLine = {
-  content: string;
-  translation?: string;
-};
-
 export async function enrichLyricLines(
   lines: string[],
-  model = config.geminiModel
-): Promise<{ lines: EnrichedLyricLine[]; usedGemini: boolean; error?: string }> {
+  model = config.geminiModel,
+  instruction: string = LINE_ENRICH_INSTRUCTION
+): Promise<{ lines: EnrichedLyricLine[]; used: boolean; error?: string }> {
   const fallback: EnrichedLyricLine[] = lines.map((text) => ({ content: text }));
   if (!config.geminiApiKey) {
-    return { lines: fallback, usedGemini: false, error: "GEMINI_API_KEY is not configured" };
+    return { lines: fallback, used: false, error: "GEMINI_API_KEY is not configured" };
   }
   if (lines.length === 0) {
-    return { lines: [], usedGemini: false };
+    return { lines: [], used: false };
   }
 
   const selected = normalizeModelId(model) || config.geminiModel;
@@ -269,7 +215,7 @@ export async function enrichLyricLines(
         model: selected,
         contents: `Translate and add furigana to each numbered line. Return ${batch.length} items.\n\n${numbered}`,
         config: {
-          systemInstruction: LINE_ENRICH_INSTRUCTION,
+          systemInstruction: instruction,
           responseMimeType: "application/json",
           responseSchema: lyricLinesResponseSchema,
           temperature: 0
@@ -301,7 +247,7 @@ export async function enrichLyricLines(
   const translated = enriched.filter((line) => line.translation).length;
   return {
     lines: enriched,
-    usedGemini: used,
+    used,
     error:
       translated === 0
         ? errors[0] ?? "Gemini returned no translations"
@@ -345,49 +291,7 @@ export async function parseJapaneseToKanjiBE(
     throw new Error("Gemini returned invalid JSON");
   }
 
-  return stripImportedNewlines(importSchema.parse(normalizeImportPayload(parsed)));
+  return finalizeImportPayload(parsed);
 }
 
-export function stripLineBreaks(value: string): string {
-  return value
-    .replace(/\\r\\n|\\n|\\r/g, "")
-    .replace(/\r\n|\r|\n/g, "")
-    .replace(/[\u2028\u2029]/g, "")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-}
-
-function cleanBlocks(blocks: ImportPayload["stories"][number]["blocks"]) {
-  return blocks.map((block) => ({
-    ...block,
-    content: block.content ? stripLineBreaks(block.content) : block.content,
-    translation: block.translation ? stripLineBreaks(block.translation) : block.translation,
-    caption: block.caption ? stripLineBreaks(block.caption) : block.caption,
-    speaker: block.speaker ? stripLineBreaks(block.speaker) : block.speaker
-  }));
-}
-
-function stripImportedNewlines(payload: ImportPayload): ImportPayload {
-  return {
-    stories: payload.stories.map((item) => ({
-      ...item,
-      title: stripLineBreaks(item.title),
-      translation: item.translation ? stripLineBreaks(item.translation) : item.translation,
-      blocks: cleanBlocks(item.blocks)
-    })),
-    lyrics: payload.lyrics.map((item) => ({
-      ...item,
-      title: stripLineBreaks(item.title),
-      artist: stripLineBreaks(item.artist),
-      translation: item.translation ? stripLineBreaks(item.translation) : item.translation,
-      blocks: cleanBlocks(item.blocks)
-    })),
-    conversations: payload.conversations.map((item) => ({
-      ...item,
-      title: stripLineBreaks(item.title),
-      topic: stripLineBreaks(item.topic),
-      translation: item.translation ? stripLineBreaks(item.translation) : item.translation,
-      blocks: cleanBlocks(item.blocks)
-    }))
-  };
-}
+export { stripLineBreaks } from "./aiShared.js";

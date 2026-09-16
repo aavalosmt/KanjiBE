@@ -193,7 +193,46 @@ export type VocabularySetSummary = {
   updated_at: string;
 };
 
+export type ExampleSentence = {
+  sentence_index: number;
+  text: string;
+  furigana: string;
+  translation: string;
+  translationLang: string;
+  notes?: string;
+};
+
+// Server-driven UI layout tree — see src/lib/sdui.ts for the heuristic that
+// computes it and the Zod schema that validates an admin override.
+export type SduiDataKey = "words" | "pages" | "example_sentences";
+
+export type SduiNode =
+  | {
+      id: string;
+      type: "stack";
+      title?: string;
+      direction?: "vertical" | "horizontal";
+      children: SduiNode[];
+    }
+  | {
+      id: string;
+      type: "collapsible";
+      title: string;
+      collapsed: boolean;
+      children: SduiNode[];
+    }
+  | { id: string; type: "grid"; columns: number; data: SduiDataKey }
+  | {
+      id: string;
+      type: "table";
+      data: SduiDataKey;
+      tableColumns?: { key: string; label: string }[];
+    }
+  | { id: string; type: "carousel"; data: SduiDataKey };
+
 export type VocabularySet = VocabularySetSummary & {
   pages: VocabularyPage[];
   words: VocabularyWordEntry[];
+  example_sentences: ExampleSentence[];
+  layout: SduiNode;
 };

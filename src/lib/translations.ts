@@ -2,12 +2,21 @@ import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { asString } from "./pagination.js";
 
-export type EntityType = "story" | "lyric" | "conversation" | "vocabularyWord";
+export type EntityType =
+  | "story"
+  | "lyric"
+  | "conversation"
+  | "vocabularyWord"
+  | "exampleSentence";
 
 // The language the existing translation columns / embedded block JSON
 // already represent. The Translation table never stores this locale — it
 // only layers additional languages on top.
 export const LEGACY_LANG = "es";
+
+// Example sentences are newer content and store their base translation in
+// English instead of Spanish; Spanish/others are overlays.
+export const EXAMPLE_SENTENCE_BASE_LANG = "en";
 
 // blockId used for an item's own title-level translation, as opposed to one
 // of its blocks.
@@ -23,12 +32,13 @@ export type ResolvedTranslation = { text: string | null; lang: string };
 export function resolveText(
   legacyText: string | null | undefined,
   overlayText: string | undefined,
-  lang: string
+  lang: string,
+  baseLang: string = LEGACY_LANG
 ): ResolvedTranslation {
-  if (lang !== LEGACY_LANG && overlayText !== undefined) {
+  if (lang !== baseLang && overlayText !== undefined) {
     return { text: overlayText, lang };
   }
-  return { text: legacyText ?? null, lang: LEGACY_LANG };
+  return { text: legacyText ?? null, lang: baseLang };
 }
 
 export type EntityOverlay = Map<string, string>;
@@ -37,10 +47,11 @@ export type TranslationOverlay = Map<string, EntityOverlay>;
 export async function fetchTranslationOverlay(
   entityType: EntityType,
   entityIds: string[],
-  lang: string
+  lang: string,
+  baseLang: string = LEGACY_LANG
 ): Promise<TranslationOverlay> {
   const overlay: TranslationOverlay = new Map();
-  if (lang === LEGACY_LANG || entityIds.length === 0) {
+  if (lang === baseLang || entityIds.length === 0) {
     return overlay;
   }
 

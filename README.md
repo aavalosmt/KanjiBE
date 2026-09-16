@@ -26,7 +26,7 @@ El servidor queda en `http://localhost:3000`.
 
 Panel CRUD: [http://localhost:3000/admin/](http://localhost:3000/admin/)  
 Importar JSON (cuentos/canciones/conversaciones): [http://localhost:3000/admin/#/import](http://localhost:3000/admin/#/import) — formato en [`docs/import-json.md`](docs/import-json.md).  
-Tokenizar con Gemini: misma página, requiere `GEMINI_API_KEY`.  
+Tokenizar / traducir con IA: misma página. Elige proveedor en el panel — Gemini (`GEMINI_API_KEY`) o Grok/xAI (`XAI_API_KEY`). `AI_PROVIDER` fija el predeterminado (`gemini` por defecto); `XAI_MODEL` el modelo Grok por defecto.  
 Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a hosting).
 
 ## Endpoints públicos (iOS)
@@ -42,7 +42,8 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/manga?page=1&limit=20` — tomos (sin `pages`)
 - `GET /api/manga/:id` — tomo completo con `pages[].dialogues[]` (OCR + morfología ya resuelta por el cliente desktop, ver [`docs/manga-ingest.md`](docs/manga-ingest.md))
 - `GET /api/vocabulary?page=1&limit=20&topic=body` — sets de vocabulario (sin `pages`/`words`)
-- `GET /api/vocabulary/:topic/:subtopic` — set completo: `pages[].entries[]` si es imagen, `words[]` si es lista (ver [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md))
+- `GET /api/vocabulary/:topic/:subtopic` — set completo: `pages[].entries[]` si es imagen, `words[]` si es lista, más `example_sentences[]` y `layout` (SDUI: columnas/tabla/colapsable/carrusel, ver [`docs/vocabulary-sdui.md`](docs/vocabulary-sdui.md)) (ver [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md))
+- `GET /api/examples/:topic/:subtopic?lang=` — oraciones de ejemplo de un subtopic (idioma base **inglés**); `404` si el subtopic no está registrado
 - Admin: `GET /api/admin/lrclib/search?q=` y `POST /api/admin/lrclib/import` `{ id }` — busca, sincroniza, tokeniza y guarda
 - `GET /health`
 - `GET /api/lookup?q=知らない` — lematiza (知る) y describe el verbo en inglés (`godan verb 知る in the negative form`). También `GET /api/lookup/知らない`.
@@ -75,9 +76,13 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
 - Vocabulario (dirigido por `topic`/`subtopic` en vez de un id, completo en [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md)):
   - `POST /api/admin/vocabulary/upload-image` — `multipart/form-data`, campos `image` + `image_checksum` (sha256), dedup por checksum (solo sets `content_type: "image"`)
   - `POST /api/admin/vocabulary/ingest` — upsert de un set + sus páginas/entradas o palabras, idempotente por `(topic, subtopic)`; `content_type: "image" | "list"` decide la forma
-  - `GET /api/admin/vocabulary`, `PATCH /api/admin/vocabulary/:topic/:subtopic` (title/cover_url), `GET /api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex`
+  - `GET /api/admin/vocabulary`, `PATCH /api/admin/vocabulary/:topic/:subtopic` (title/cover_url/layout — SDUI, ver [`docs/vocabulary-sdui.md`](docs/vocabulary-sdui.md)), `GET /api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex`
   - `PATCH /api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex/entries/:entryIndex`, `PUT .../pages/:pageIndex/image`, `DELETE .../pages/:pageIndex` (formato imagen)
   - `PATCH /api/admin/vocabulary/:topic/:subtopic/words/:wordIndex`, `DELETE .../words/:wordIndex` (formato lista)
+- Oraciones de ejemplo (atadas a un topic/subtopic registrado, base inglés, ver [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md)):
+  - `PUT /api/admin/examples/:topic/:subtopic` — reemplazo total `{ sentences: [{ id?, text, furigana, translation, notes? }] }`
+  - `PUT /api/admin/examples/:topic/:subtopic/:index/translations/:lang` — overlay por idioma (400 si `lang=en`)
+  - `POST /api/admin/examples/:topic/:subtopic/generate` `{ text, provider?, model? }` — furigana + traducción al inglés vía Gemini/Grok, sin persistir
 
 ## Hosting (Railway)
 

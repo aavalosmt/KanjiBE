@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { toVocabularySet, toVocabularySetSummary } from "../lib/vocabularySerialize.js";
+import { listExampleSentences } from "../lib/exampleSentenceSerialize.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
 
@@ -46,11 +47,14 @@ vocabularyRouter.get("/:topic/:subtopic", async (req, res) => {
     return;
   }
 
-  const overlay = await fetchTranslationOverlay(
-    "vocabularyWord",
-    set.words.map((word) => word.id),
-    lang
-  );
+  const [overlay, exampleSentences] = await Promise.all([
+    fetchTranslationOverlay(
+      "vocabularyWord",
+      set.words.map((word) => word.id),
+      lang
+    ),
+    listExampleSentences(req.params.topic, req.params.subtopic, lang)
+  ]);
 
-  res.json(toVocabularySet(set, lang, overlay));
+  res.json(toVocabularySet(set, lang, overlay, exampleSentences));
 });

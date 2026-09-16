@@ -116,7 +116,7 @@ Reintentar la misma petición nunca duplica datos:
 Sin auth, mismo estilo que `/api/stories`, `/api/lyrics` y `/api/manga`:
 
 - `GET /api/vocabulary?page=&limit=&topic=` — resumen de sets (sin `pages`/`words`), filtrable por `topic`
-- `GET /api/vocabulary/:topic/:subtopic` — set completo: `pages[].entries[]` si es `content_type: "image"`, `words[]` si es `content_type: "list"` (el array no aplicable siempre vuelve vacío, no `null`/ausente)
+- `GET /api/vocabulary/:topic/:subtopic` — set completo: `pages[].entries[]` si es `content_type: "image"`, `words[]` si es `content_type: "list"` (el array no aplicable siempre vuelve vacío, no `null`/ausente). Incluye además `example_sentences[]` (ver "Oraciones de ejemplo" abajo) y `layout` (SDUI — cómo renderizar todo lo anterior, ver [`docs/vocabulary-sdui.md`](vocabulary-sdui.md)).
 
 ## 6. Edición / administración
 
@@ -126,7 +126,7 @@ Bajo `/api/admin/vocabulary`, misma auth que la Sección 1:
 |---|---|---|
 | `GET` | `/api/admin/vocabulary` | Listar sets |
 | `GET` | `/api/admin/vocabulary/:topic/:subtopic` | Detalle de set |
-| `PATCH` | `/api/admin/vocabulary/:topic/:subtopic` | Editar metadata (`title`, `cover_url`) |
+| `PATCH` | `/api/admin/vocabulary/:topic/:subtopic` | Editar metadata (`title`, `cover_url`, `layout` — SDUI, ver [`docs/vocabulary-sdui.md`](vocabulary-sdui.md)) |
 | `GET` | `/api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex` | Detalle de página + entradas (formato imagen) |
 | `PATCH` | `/api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex/entries/:entryIndex` | Editar una entrada (formato imagen) |
 | `PUT` | `/api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex/image` | Reemplazar imagen de la página (formato imagen) |
@@ -136,7 +136,29 @@ Bajo `/api/admin/vocabulary`, misma auth que la Sección 1:
 
 UI en `/admin` → pestaña **Vocabulario**: lista de sets (filtrable por topic), y por set: el editor de páginas con overlay de cajas (formato imagen) o un editor de filas término/furigana/traducción (formato lista), según corresponda. Borrar sets completos no está cubierto (extensión natural si hace falta).
 
-## 7. Qué queda fuera a propósito (MVP)
+## 7. Oraciones de ejemplo (topic / subtopic)
+
+Oraciones sueltas atadas a un `(topic, subtopic)` registrado — existen aunque no haya un `VocabularySet`. **El idioma base es inglés** (a diferencia de historias/letras/vocabulario, que son español): `translation` guarda el inglés y el español u otros idiomas son overlays en la tabla `Translation` (`entityType: "exampleSentence"`). Con `?lang` ausente o `en` devuelve el inglés con `translationLang: "en"`.
+
+Forma de cada oración: `{ sentence_index, text, furigana, translation, translationLang, notes? }` — `text` es el japonés plano, `furigana` el markup `[漢](furigana:…)`.
+
+### Lectura pública
+
+- `GET /api/examples/:topic/:subtopic?lang=` — `{ topic, subtopic, data: ExampleSentence[] }`. `404` si el subtopic no está registrado; `data: []` si está registrado pero vacío.
+- También embebidas en `GET /api/vocabulary/:topic/:subtopic` como `example_sentences[]`.
+
+### Administración (`/api/admin/examples`, misma auth que la Sección 1)
+
+| Método | Ruta | Acción |
+|---|---|---|
+| `GET` | `/:topic/:subtopic?lang=` | Listar (para el editor) |
+| `PUT` | `/:topic/:subtopic` | Reemplazo total. Body `{ sentences: [{ id?, text, furigana, translation, notes? }] }`. Las filas con `id` conocido se actualizan en sitio (conservan overlays); sin `id` se crean; los `id` existentes ausentes del payload se borran (con sus overlays). `sentenceIndex` se reasigna por orden del array. |
+| `PUT` | `/:topic/:subtopic/:index/translations/:lang` | Overlay de un idioma (`{ translation }`), direccionado por `sentenceIndex`. `400` si `lang === "en"` (el base). |
+| `POST` | `/:topic/:subtopic/generate` | `{ text, provider?, model? }` — parte `text` en líneas y las pasa por el motor de IA (Gemini/Grok) para rellenar furigana + traducción **al inglés**. Devuelve `{ sentences, usedAi, aiError }` sin persistir nada. `503` si falta la API key del proveedor. |
+
+UI en `/admin` → **Vocabulario** → un set → panel **Ejemplos** (pestañas EN base / ES overlay, "Añadir oración", "Generar con IA", "Guardar ejemplos").
+
+## 8. Qué queda fuera a propósito (MVP)
 
 - **Tokenización/traducción en el backend.** El cliente entrega el contenido ya resuelto; este backend lo persiste sin tocarlo.
 - **Object storage.** Disco local + volumen, igual que el resto del proyecto.

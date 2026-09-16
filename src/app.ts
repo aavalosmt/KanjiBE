@@ -9,6 +9,8 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminRouter } from "./routes/admin.js";
 import { analyzeRouter } from "./routes/analyze.js";
 import { conversationsRouter } from "./routes/conversations.js";
+import { examplesRouter } from "./routes/examples.js";
+import { exampleSentencesAdminRouter } from "./routes/exampleSentencesAdmin.js";
 import { kanjiRouter } from "./routes/kanji.js";
 import { lookupRouter } from "./routes/lookup.js";
 import { lyricsRouter } from "./routes/lyrics.js";
@@ -80,10 +82,12 @@ export function createApp() {
   app.use("/api/analyze", analyzeRouter);
   app.use("/api/manga", mangaRouter);
   app.use("/api/vocabulary", vocabularyRouter);
+  app.use("/api/examples", examplesRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/admin", uploadRouter);
   app.use("/api/admin/manga", mangaAdminRouter);
   app.use("/api/admin/vocabulary", vocabularyAdminRouter);
+  app.use("/api/admin/examples", exampleSentencesAdminRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

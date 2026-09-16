@@ -60,6 +60,22 @@ model Subtopic {
   @@unique([topicSlug, slug])
 }
 
+model ExampleSentence {
+  id            String   @id @default(uuid())
+  topicSlug     String
+  subtopicSlug  String
+  sentenceIndex Int
+  text          String
+  furigana      String
+  translation   String
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([topicSlug, subtopicSlug, sentenceIndex])
+  @@index([topicSlug, subtopicSlug])
+}
+
 model MangaVolume {
   id           String      @id
   title        String
@@ -116,6 +132,9 @@ model VocabularySet {
   contentType String
   title       String
   coverUrl    String?
+  // Admin override of the computed SDUI layout (JSON text of an SduiNode).
+  // Null means "use the heuristic default" — see src/lib/sdui.ts.
+  layout      String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   pages       VocabularyPage[]

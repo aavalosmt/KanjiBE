@@ -12,6 +12,7 @@ process.env.PUBLIC_BASE_URL = "http://localhost:3000";
 process.env.UPLOAD_DIR = "./uploads-test";
 process.env.CORS_ORIGIN = "*";
 process.env.GEMINI_API_KEY = "";
+process.env.XAI_API_KEY = "";
 
 fs.mkdirSync("data", { recursive: true });
 fs.mkdirSync("uploads-test", { recursive: true });

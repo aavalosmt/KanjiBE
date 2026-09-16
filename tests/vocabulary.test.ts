@@ -327,6 +327,85 @@ describe("admin vocabulary word editing (list type)", () => {
   });
 });
 
+describe("admin vocabulary word variants (list type)", () => {
+  beforeEach(async () => {
+    await registerTaxonomy();
+  });
+
+  it("ingests a word with a variant and omits variant for words without one", async () => {
+    await request(app)
+      .post("/api/admin/vocabulary/ingest")
+      .set(admin)
+      .send(
+        listIngestPayload({
+          words: [
+            {
+              term: "食べる",
+              furigana: "[食べる](furigana:た.べる)",
+              translation: "to eat",
+              variant: { term: "食べさせる", furigana: "[食べさせる](furigana:た.べ.さ.せる)", label: "Causative" }
+            },
+            { term: "飲む", furigana: "[飲む](furigana:の.む)", translation: "to drink" }
+          ]
+        })
+      );
+
+    const res = await request(app).get("/api/vocabulary/body/fingers");
+    expect(res.body.words[0].variant).toEqual({
+      term: "食べさせる",
+      furigana: "[食べさせる](furigana:た.べ.さ.せる)",
+      label: "Causative"
+    });
+    expect(res.body.words[1].variant).toBeUndefined();
+  });
+
+  it("sets a variant via PATCH and reflects it on GET", async () => {
+    await request(app).post("/api/admin/vocabulary/ingest").set(admin).send(listIngestPayload());
+
+    const patch = await request(app)
+      .patch("/api/admin/vocabulary/body/fingers/words/0")
+      .set(admin)
+      .send({ variant: { term: "x", furigana: "[x](furigana:x)", label: "Test" } });
+    expect(patch.status).toBe(200);
+    expect(patch.body.variant).toEqual({ term: "x", furigana: "[x](furigana:x)", label: "Test" });
+  });
+
+  it("clears a variant with variant: null", async () => {
+    await request(app)
+      .post("/api/admin/vocabulary/ingest")
+      .set(admin)
+      .send(
+        listIngestPayload({
+          words: [
+            {
+              term: "食べる",
+              furigana: "[食べる](furigana:た.べる)",
+              translation: "to eat",
+              variant: { term: "食べさせる", furigana: "[食べさせる](furigana:た.べ.さ.せる)", label: "Causative" }
+            }
+          ]
+        })
+      );
+
+    const patch = await request(app)
+      .patch("/api/admin/vocabulary/body/fingers/words/0")
+      .set(admin)
+      .send({ variant: null });
+    expect(patch.status).toBe(200);
+    expect(patch.body.variant).toBeUndefined();
+  });
+
+  it("rejects a variant object missing a sub-field", async () => {
+    await request(app).post("/api/admin/vocabulary/ingest").set(admin).send(listIngestPayload());
+
+    const res = await request(app)
+      .patch("/api/admin/vocabulary/body/fingers/words/0")
+      .set(admin)
+      .send({ variant: { term: "x", furigana: "[x](furigana:x)" } });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("admin vocabulary page/entry editing (image type)", () => {
   beforeEach(async () => {
     await registerTaxonomy();

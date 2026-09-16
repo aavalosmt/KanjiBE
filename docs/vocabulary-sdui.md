@@ -26,6 +26,17 @@ Every node has a stable `id` and a `type`. Containers (`stack`, `collapsible`) h
 `data` is one of `"words" | "pages" | "example_sentences"` — the array in the same vocabulary response
 the node renders.
 
+### Comparing two forms of a word (`variant`)
+
+A `words` item may carry an optional second form of the same word —
+`variant: { term, furigana, label }` (e.g. `食べさせる` labeled `"Causative"` next to the plain
+`食べる`). It shares the word's one `translation`; there's no separate gloss per form.
+
+A `table` bound to `data: "words"` can reference it with dot-path keys in `tableColumns`:
+`"variant.term"`, `"variant.furigana"`, `"variant.label"`. A client resolving `tableColumns[].key`
+should split on `.` and walk the path on each `words` item; when an item has no `variant`, that cell is
+empty.
+
 ### Example
 
 ```json
@@ -49,7 +60,10 @@ This is what makes the tree safe to extend without a client release.
 
 ## Heuristic (default when there's no admin override)
 
-- `content_type: "list"` — `words.length <= 12` → `grid` (`columns: 2`); otherwise → `table`.
+- `content_type: "list"` — if **any** word has a `variant`, always a `table` over `words` with explicit
+  columns `[{key:"term",label:"Term"}, {key:"variant.term",label:<first variant's label>}, {key:"translation",label:"Translation"}]`,
+  regardless of word count. Otherwise: `words.length <= 12` → `grid` (`columns: 2`); else → `table`
+  (default columns).
 - `content_type: "image"` — always `carousel` over `pages`.
 - `example_sentences.length > 0` — a `collapsible` (`collapsed: true`) wrapping a `grid` (`columns: 1`)
   over `example_sentences` is appended; omitted entirely when there are none.

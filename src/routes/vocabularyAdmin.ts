@@ -182,7 +182,10 @@ vocabularyAdminRouter.post("/ingest", async (req, res) => {
           wordIndex: index,
           term: word.term,
           furigana: word.furigana,
-          translation: word.translation
+          translation: word.translation,
+          variantTerm: word.variant?.term ?? null,
+          variantFurigana: word.variant?.furigana ?? null,
+          variantLabel: word.variant?.label ?? null
         }))
       });
     }
@@ -414,12 +417,26 @@ vocabularyAdminRouter.patch("/:topic/:subtopic/words/:wordIndex", async (req, re
     return;
   }
 
+  // undefined = field omitted, leave untouched; null = clear the variant;
+  // an object = set/replace it (same three-way convention as the SDUI layout override).
+  const variantFields =
+    payload.variant === undefined
+      ? {}
+      : payload.variant === null
+        ? { variantTerm: null, variantFurigana: null, variantLabel: null }
+        : {
+            variantTerm: payload.variant.term,
+            variantFurigana: payload.variant.furigana,
+            variantLabel: payload.variant.label
+          };
+
   const updated = await prisma.vocabularyWord.update({
     where: { id: word.id },
     data: {
       term: payload.term,
       furigana: payload.furigana,
-      translation: payload.translation
+      translation: payload.translation,
+      ...variantFields
     }
   });
   res.json(toVocabularyWord(updated));

@@ -379,10 +379,20 @@ export const vocabularyPageIngestSchema = z.object({
   entries: z.array(vocabularyEntryIngestSchema).default([])
 });
 
+// Optional second form of the same word (e.g. causative/shieki vs. plain).
+// All three sub-fields are required together — there's no "partially filled"
+// variant, so no extra refine is needed on the schemas below.
+export const vocabularyWordVariantSchema = z.object({
+  term: z.string().trim().min(1),
+  furigana: z.string().trim().min(1),
+  label: z.string().trim().min(1)
+});
+
 export const vocabularyWordIngestSchema = z.object({
   term: z.string().trim().min(1),
   furigana: z.string().default(""),
-  translation: z.string().trim().min(1)
+  translation: z.string().trim().min(1),
+  variant: vocabularyWordVariantSchema.optional()
 });
 
 const vocabularyIngestSchemaVersion = z
@@ -431,7 +441,9 @@ export const vocabularyWordPatchSchema = z
   .object({
     term: z.string().trim().min(1).optional(),
     furigana: z.string().optional(),
-    translation: z.string().trim().min(1).optional()
+    translation: z.string().trim().min(1).optional(),
+    // null clears an existing variant, an object sets/replaces it, omitted leaves it untouched.
+    variant: vocabularyWordVariantSchema.nullable().optional()
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required"

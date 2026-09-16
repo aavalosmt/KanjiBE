@@ -173,12 +173,19 @@ export type VocabularyPage = {
 
 export type VocabularyContentType = "image" | "list";
 
+export type VocabularyWordVariant = {
+  term: string;
+  furigana: string;
+  label: string;
+};
+
 export type VocabularyWordEntry = {
   word_index: number;
   term: string;
   furigana: string;
   translation: string;
   translationLang: string;
+  variant?: VocabularyWordVariant;
 };
 
 export type VocabularySetSummary = {

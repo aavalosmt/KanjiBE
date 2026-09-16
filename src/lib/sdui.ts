@@ -77,11 +77,28 @@ export function computeDefaultLayout(input: {
   const children: SduiNode[] = [];
 
   if (input.contentType === "list") {
-    children.push(
-      input.words.length <= GRID_THRESHOLD
-        ? { id: "content", type: "grid", columns: GRID_COLUMNS, data: "words" }
-        : { id: "content", type: "table", data: "words" }
-    );
+    const variantLabel = input.words.find((word) => word.variant)?.variant?.label;
+    if (variantLabel) {
+      // Any word carrying a second form (e.g. causative/shieki vs. plain) means
+      // this is a comparison list — always render it as a table with both
+      // forms as explicit columns, regardless of word count.
+      children.push({
+        id: "content",
+        type: "table",
+        data: "words",
+        tableColumns: [
+          { key: "term", label: "Term" },
+          { key: "variant.term", label: variantLabel },
+          { key: "translation", label: "Translation" }
+        ]
+      });
+    } else {
+      children.push(
+        input.words.length <= GRID_THRESHOLD
+          ? { id: "content", type: "grid", columns: GRID_COLUMNS, data: "words" }
+          : { id: "content", type: "table", data: "words" }
+      );
+    }
   } else {
     children.push({ id: "content", type: "carousel", data: "pages" });
   }

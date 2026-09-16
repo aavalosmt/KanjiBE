@@ -2303,6 +2303,22 @@ function vocabularyWordRow(word, index) {
         <span>Traducción ${editorLang === "es" ? "" : `(${editorLang.toUpperCase()})`}</span>
         <input data-field="translation" value="${escapeHtml(word.translation)}" />
       </label>
+      <details class="variant-fields" ${word.variant ? "open" : ""}>
+        <summary class="muted">Forma alterna (opcional, ej. causativa/shieki)</summary>
+        <label class="field">
+          <span>Término alterno</span>
+          <input class="jp" data-field="variant_term" value="${escapeHtml(word.variant?.term || "")}" ${disabled} />
+        </label>
+        <label class="field">
+          <span>Furigana alterna</span>
+          <input class="jp" data-field="variant_furigana" value="${escapeHtml(word.variant?.furigana || "")}" ${disabled} />
+        </label>
+        <div class="manga-furigana-preview" data-variant-preview></div>
+        <label class="field">
+          <span>Etiqueta (ej. "Causativa")</span>
+          <input data-field="variant_label" value="${escapeHtml(word.variant?.label || "")}" ${disabled} />
+        </label>
+      </details>
       <div class="actions">
         <button class="primary" type="submit">Guardar</button>
       </div>
@@ -2358,23 +2374,45 @@ function bindVocabularyWordList(set) {
     updatePreview();
     furiganaField.addEventListener("input", updatePreview);
 
+    const variantPreview = form.querySelector("[data-variant-preview]");
+    const variantFuriganaField = form.querySelector('[data-field="variant_furigana"]');
+    if (variantPreview && variantFuriganaField) {
+      const updateVariantPreview = () => {
+        variantPreview.replaceChildren(renderFurigana(variantFuriganaField.value));
+      };
+      updateVariantPreview();
+      variantFuriganaField.addEventListener("input", updateVariantPreview);
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const index = Number(form.dataset.wordIndex);
       const button = form.querySelector('button[type="submit"]');
-      button.disabled = true;
       const translation = form.querySelector('[data-field="translation"]').value.trim();
       try {
         if (editorLang === "es") {
+          const variantTerm = form.querySelector('[data-field="variant_term"]').value.trim();
+          const variantFurigana = variantFuriganaField.value.trim();
+          const variantLabel = form.querySelector('[data-field="variant_label"]').value.trim();
+          const filled = [variantTerm, variantFurigana, variantLabel].filter(Boolean).length;
+          if (filled !== 0 && filled !== 3) {
+            toast("Completa los 3 campos de la forma alterna, o déjalos vacíos", "error");
+            return;
+          }
+          const variant = filled === 3 ? { term: variantTerm, furigana: variantFurigana, label: variantLabel } : null;
+
+          button.disabled = true;
           await api(`${vocabularySetApiPath(set.topic, set.subtopic)}/words/${index}`, {
             method: "PATCH",
             body: JSON.stringify({
               term: form.querySelector('[data-field="term"]').value.trim(),
               furigana: furiganaField.value,
-              translation
+              translation,
+              variant
             })
           });
         } else {
+          button.disabled = true;
           await api(
             `${vocabularySetApiPath(set.topic, set.subtopic)}/words/${index}/translations/${editorLang}`,
             {

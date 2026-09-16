@@ -97,6 +97,37 @@ describe("vocabulary layout: heuristic default", () => {
     expect(res.body.layout.children[0]).toMatchObject({ id: "content", type: "carousel", data: "pages" });
   });
 
+  it("uses a comparison table when any word has a variant, even under the grid threshold", async () => {
+    await request(app)
+      .post("/api/admin/vocabulary/ingest")
+      .set(admin)
+      .send(
+        wordsPayload(3, {
+          words: [
+            { term: "見る", furigana: "[見る](furigana:み.る)", translation: "to see" },
+            {
+              term: "食べる",
+              furigana: "[食べる](furigana:た.べる)",
+              translation: "to eat",
+              variant: { term: "食べさせる", furigana: "[食べさせる](furigana:た.べ.さ.せる)", label: "Causative" }
+            }
+          ]
+        })
+      );
+
+    const res = await request(app).get("/api/vocabulary/body/fingers");
+    expect(res.body.layout.children[0]).toMatchObject({
+      id: "content",
+      type: "table",
+      data: "words",
+      tableColumns: [
+        { key: "term", label: "Term" },
+        { key: "variant.term", label: "Causative" },
+        { key: "translation", label: "Translation" }
+      ]
+    });
+  });
+
   it("appends a collapsible examples node only when there are example sentences", async () => {
     await request(app).post("/api/admin/vocabulary/ingest").set(admin).send(wordsPayload(3));
 

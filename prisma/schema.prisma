@@ -189,6 +189,12 @@ model VocabularyWord {
   term        String
   furigana    String
   translation String
+  // Optional second form of the same word (e.g. causative/shieki vs. plain),
+  // shown as a comparison column by the SDUI table heuristic. All three are
+  // set together or not at all — see src/validators.ts.
+  variantTerm     String?
+  variantFurigana String?
+  variantLabel    String?
 
   @@unique([setId, wordIndex])
 }

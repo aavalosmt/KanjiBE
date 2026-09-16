@@ -55,12 +55,17 @@ export function toVocabularyWord(
   overlay?: EntityOverlay
 ): VocabularyWordEntry {
   const resolved = resolveText(row.translation, overlay?.get(""), lang);
+  const variant =
+    row.variantTerm && row.variantFurigana && row.variantLabel
+      ? { term: row.variantTerm, furigana: row.variantFurigana, label: row.variantLabel }
+      : undefined;
   return {
     word_index: row.wordIndex,
     term: row.term,
     furigana: row.furigana,
     translation: resolved.text ?? "",
-    translationLang: resolved.lang
+    translationLang: resolved.lang,
+    ...(variant ? { variant } : {})
   };
 }
 

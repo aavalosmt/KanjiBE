@@ -3,7 +3,7 @@
 Listas de vocabulario, dirigidas por una taxonomía de dos niveles (`topic`/`subtopic`) en vez de un id opaco — p. ej. `body`/`general`, `body`/`fingers`. Cada `(topic, subtopic)` es **un** set de vocabulario, y cada set tiene uno de dos formatos de contenido:
 
 - **`content_type: "image"`** — igual que Manga: páginas de imagen con cajas delimitadoras posicionadas por palabra (para diagramas tipo "partes del cuerpo").
-- **`content_type: "list"`** — un array plano de `{ term, furigana, translation }`, sin imagen (para listas de palabras simples).
+- **`content_type: "list"`** — un array plano de `{ term, furigana, translation, variant? }`, sin imagen (para listas de palabras simples).
 
 El backend persiste y sirve el resultado; no re-tokeniza ni traduce nada de lo que llega aquí.
 
@@ -85,10 +85,15 @@ Respuesta `200`: `{ "image_url": "https://.../uploads/<uuid>.png", "already_exis
   "content_type": "list",
   "words": [
     { "term": "指", "furigana": "[指](furigana:ゆび)", "translation": "finger" },
-    { "term": "親指", "furigana": "[親指](furigana:おや.ゆび)", "translation": "thumb" }
+    {
+      "term": "食べる", "furigana": "[食べる](furigana:た.べる)", "translation": "to eat",
+      "variant": { "term": "食べさせる", "furigana": "[食べさせる](furigana:た.べ.さ.せる)", "label": "Causative" }
+    }
   ]
 }
 ```
+
+`variant` es opcional: una segunda forma de la misma palabra (p. ej. causativa/shieki vs. llana), mostrada como columna aparte por el heurístico de `layout` (ver [`docs/vocabulary-sdui.md`](vocabulary-sdui.md)). `label` es el texto de esa columna (`"Causative"`, `"Potential"`, lo que aplique) — no hay traducción propia, comparte la `translation` de la palabra. Si se manda, los tres subcampos (`term`, `furigana`, `label`) son obligatorios juntos.
 
 `cover_url` es opcional en ambos formatos — si no se manda, queda `null`. Se puede setear o cambiar después con `PATCH /api/admin/vocabulary/:topic/:subtopic` sin volver a mandar páginas/palabras.
 
@@ -131,7 +136,7 @@ Bajo `/api/admin/vocabulary`, misma auth que la Sección 1:
 | `PATCH` | `/api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex/entries/:entryIndex` | Editar una entrada (formato imagen) |
 | `PUT` | `/api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex/image` | Reemplazar imagen de la página (formato imagen) |
 | `DELETE` | `/api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex` | Borrar página (formato imagen, cascada a sus entradas) |
-| `PATCH` | `/api/admin/vocabulary/:topic/:subtopic/words/:wordIndex` | Editar una palabra (formato lista) |
+| `PATCH` | `/api/admin/vocabulary/:topic/:subtopic/words/:wordIndex` | Editar una palabra (formato lista): `{ term?, furigana?, translation?, variant? }` — `variant: null` la borra, un objeto la reemplaza, omitido no la toca |
 | `DELETE` | `/api/admin/vocabulary/:topic/:subtopic/words/:wordIndex` | Borrar una palabra (formato lista) |
 
 UI en `/admin` → pestaña **Vocabulario**: lista de sets (filtrable por topic), y por set: el editor de páginas con overlay de cajas (formato imagen) o un editor de filas término/furigana/traducción (formato lista), según corresponda. Borrar sets completos no está cubierto (extensión natural si hace falta).

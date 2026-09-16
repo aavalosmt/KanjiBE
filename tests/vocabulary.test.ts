@@ -406,6 +406,151 @@ describe("admin vocabulary word variants (list type)", () => {
   });
 });
 
+describe("admin vocabulary word append (list type)", () => {
+  beforeEach(async () => {
+    await registerTaxonomy();
+    await request(app).post("/api/admin/vocabulary/ingest").set(admin).send(listIngestPayload());
+  });
+
+  it("appends without touching existing words", async () => {
+    const res = await request(app)
+      .post("/api/admin/vocabulary/body/fingers/words")
+      .set(admin)
+      .send({ words: [{ term: "中指", furigana: "[中指](furigana:なか.ゆび)", translation: "middle finger" }] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.item_count).toBe(3);
+    expect(res.body.data[0]).toMatchObject({ word_index: 2, term: "中指" });
+
+    const set = await prisma.vocabularySet.findUnique({
+      where: { topic_subtopic: { topic: "body", subtopic: "fingers" } },
+      include: { words: { orderBy: { wordIndex: "asc" } } }
+    });
+    expect(set?.words.map((w) => w.term)).toEqual(["指", "親指", "中指"]);
+  });
+
+  it("continues from the current max index after a delete leaves a gap", async () => {
+    // Delete index 0, leaving only index 1 (word count 1, but max index 1) --
+    // exercises using MAX(wordIndex) instead of words.length for the next index.
+    await request(app).delete("/api/admin/vocabulary/body/fingers/words/0").set(admin);
+    const res = await request(app)
+      .post("/api/admin/vocabulary/body/fingers/words")
+      .set(admin)
+      .send({ words: [{ term: "薬指", furigana: "[薬指](furigana:くすり.ゆび)", translation: "ring finger" }] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data[0].word_index).toBe(2);
+  });
+
+  it("appends a word with a variant", async () => {
+    const res = await request(app)
+      .post("/api/admin/vocabulary/body/fingers/words")
+      .set(admin)
+      .send({
+        words: [
+          {
+            term: "曲げる",
+            furigana: "[曲げる](furigana:ま.げる)",
+            translation: "to bend",
+            variant: { term: "曲げられる", furigana: "[曲げられる](furigana:ま.げ.ら.れる)", label: "Passive" }
+          }
+        ]
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.data[0].variant).toEqual({
+      term: "曲げられる",
+      furigana: "[曲げられる](furigana:ま.げ.ら.れる)",
+      label: "Passive"
+    });
+  });
+
+  it("404s appending to a set that doesn't exist", async () => {
+    const res = await request(app)
+      .post("/api/admin/vocabulary/body/does-not-exist/words")
+      .set(admin)
+      .send({ words: [{ term: "x", furigana: "x", translation: "x" }] });
+    expect(res.status).toBe(404);
+  });
+
+  it("400s appending to an image-type set", async () => {
+    // "general" is already registered by registerTaxonomy() in this describe's beforeEach.
+    await request(app).post("/api/admin/vocabulary/ingest").set(admin).send(imageIngestPayload());
+
+    const res = await request(app)
+      .post("/api/admin/vocabulary/body/general/words")
+      .set(admin)
+      .send({ words: [{ term: "x", furigana: "x", translation: "x" }] });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects an empty words array", async () => {
+    const res = await request(app)
+      .post("/api/admin/vocabulary/body/fingers/words")
+      .set(admin)
+      .send({ words: [] });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("vocabulary word pagination (public + admin)", () => {
+  beforeEach(async () => {
+    await registerTaxonomy();
+    await request(app)
+      .post("/api/admin/vocabulary/ingest")
+      .set(admin)
+      .send(
+        listIngestPayload({
+          words: Array.from({ length: 25 }, (_, i) => ({
+            term: `語${i}`,
+            furigana: `[語${i}](furigana:ご${i})`,
+            translation: `word ${i}`
+          }))
+        })
+      );
+  });
+
+  it("paginates with defaults (page=1, limit=20)", async () => {
+    const res = await request(app).get("/api/vocabulary/body/fingers/words");
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(20);
+    expect(res.body.pagination).toEqual({ page: 1, limit: 20, total: 25 });
+    expect(res.body.data[0].word_index).toBe(0);
+  });
+
+  it("returns the second page", async () => {
+    const res = await request(app).get("/api/vocabulary/body/fingers/words?page=2&limit=20");
+    expect(res.body.data).toHaveLength(5);
+    expect(res.body.data[0].word_index).toBe(20);
+  });
+
+  it("matches between the public and admin endpoints", async () => {
+    const pub = await request(app).get("/api/vocabulary/body/fingers/words?limit=5");
+    const adminRes = await request(app)
+      .get("/api/admin/vocabulary/body/fingers/words?limit=5")
+      .set(admin);
+    expect(adminRes.body).toEqual(pub.body);
+  });
+
+  it("404s for an unknown set", async () => {
+    const res = await request(app).get("/api/vocabulary/body/does-not-exist/words");
+    expect(res.status).toBe(404);
+  });
+
+  it("returns an empty page for an image-type set instead of erroring", async () => {
+    // "general" is already registered by registerTaxonomy() in this describe's beforeEach.
+    await request(app).post("/api/admin/vocabulary/ingest").set(admin).send(imageIngestPayload());
+
+    const res = await request(app).get("/api/vocabulary/body/general/words");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ data: [], pagination: { page: 1, limit: 20, total: 0 } });
+  });
+
+  it("401s the admin endpoint without a key", async () => {
+    const res = await request(app).get("/api/admin/vocabulary/body/fingers/words");
+    expect(res.status).toBe(401);
+  });
+});
+
 describe("admin vocabulary page/entry editing (image type)", () => {
   beforeEach(async () => {
     await registerTaxonomy();

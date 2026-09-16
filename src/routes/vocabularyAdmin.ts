@@ -3,6 +3,7 @@ import multer from "multer";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
 import {
+  paginatedVocabularyWords,
   toVocabularyEntry,
   toVocabularyPage,
   toVocabularySet,
@@ -27,6 +28,7 @@ import {
   vocabularyIngestSchema,
   vocabularySetPatchSchema,
   vocabularyWordPatchSchema,
+  vocabularyWordsAppendSchema,
   wordTranslationOverlaySchema,
   stripChecksumPrefix
 } from "../validators.js";
@@ -286,6 +288,63 @@ vocabularyAdminRouter.patch("/:topic/:subtopic", async (req, res) => {
     }
     throw error;
   }
+});
+
+// Append-only: adds to the end of an existing list-type set's words, leaving
+// existing ones (and their translation overlays) untouched. Unlike /ingest,
+// which always fully replaces the words array.
+vocabularyAdminRouter.post("/:topic/:subtopic/words", async (req, res) => {
+  const { topic, subtopic } = req.params;
+  const payload = vocabularyWordsAppendSchema.parse(req.body);
+
+  const set = await prisma.vocabularySet.findUnique({ where: { topic_subtopic: { topic, subtopic } } });
+  if (!set) {
+    res.status(404).json({ error: "Vocabulary set not found" });
+    return;
+  }
+  if (set.contentType !== "list") {
+    res.status(400).json({
+      error: `This set is content_type: "${set.contentType}" and has no words to append to`
+    });
+    return;
+  }
+
+  // Use the current max index, not the word count: deletes can leave gaps,
+  // and colliding with the (setId, wordIndex) unique constraint must be avoided.
+  const { _max } = await prisma.vocabularyWord.aggregate({
+    where: { setId: set.id },
+    _max: { wordIndex: true }
+  });
+  const startIndex = (_max.wordIndex ?? -1) + 1;
+
+  const created = await prisma.$transaction(
+    payload.words.map((word, offset) =>
+      prisma.vocabularyWord.create({
+        data: {
+          setId: set.id,
+          wordIndex: startIndex + offset,
+          term: word.term,
+          furigana: word.furigana,
+          translation: word.translation,
+          variantTerm: word.variant?.term ?? null,
+          variantFurigana: word.variant?.furigana ?? null,
+          variantLabel: word.variant?.label ?? null
+        }
+      })
+    )
+  );
+
+  const total = await prisma.vocabularyWord.count({ where: { setId: set.id } });
+  res.status(201).json({ data: created.map((word) => toVocabularyWord(word)), item_count: total });
+});
+
+vocabularyAdminRouter.get("/:topic/:subtopic/words", async (req, res) => {
+  const result = await paginatedVocabularyWords(req.params.topic, req.params.subtopic, req.query);
+  if (!result) {
+    res.status(404).json({ error: "Vocabulary set not found" });
+    return;
+  }
+  res.json(result);
 });
 
 async function findPage(topic: string, subtopic: string, pageIndex: number) {

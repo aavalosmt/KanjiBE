@@ -395,6 +395,12 @@ export const vocabularyWordIngestSchema = z.object({
   variant: vocabularyWordVariantSchema.optional()
 });
 
+// Append-only: adds to the end of an existing list-type set's words, unlike
+// /ingest which always fully replaces them.
+export const vocabularyWordsAppendSchema = z.object({
+  words: z.array(vocabularyWordIngestSchema).min(1).max(200)
+});
+
 const vocabularyIngestSchemaVersion = z
   .string()
   .refine((value) => (SUPPORTED_VOCABULARY_SCHEMA_VERSIONS as readonly string[]).includes(value), {

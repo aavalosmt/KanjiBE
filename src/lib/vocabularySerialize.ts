@@ -13,8 +13,17 @@ import type {
   VocabularySetSummary,
   VocabularyWordEntry
 } from "../types.js";
+import { prisma } from "../db.js";
+import { parsePagination } from "./pagination.js";
 import { resolveLayout } from "./sdui.js";
-import { LEGACY_LANG, resolveText, type EntityOverlay, type TranslationOverlay } from "./translations.js";
+import {
+  fetchTranslationOverlay,
+  LEGACY_LANG,
+  normalizeLang,
+  resolveText,
+  type EntityOverlay,
+  type TranslationOverlay
+} from "./translations.js";
 
 function parseJsonArray<T>(value: string): T[] {
   try {
@@ -112,5 +121,48 @@ export function toVocabularySet(
     words,
     example_sentences: exampleSentences,
     layout: resolveLayout(row, { contentType, words, pages, exampleSentences })
+  };
+}
+
+// Shared by the public and admin routes: a page of a list-type set's words,
+// windowed with skip/take rather than loading the whole array. Returns null
+// when the (topic, subtopic) pair has no set; an "image"-type set comes back
+// with an empty page (0 total) rather than an error, matching how the full
+// detail endpoint already treats the not-applicable array as always-empty.
+export async function paginatedVocabularyWords(
+  topic: string,
+  subtopic: string,
+  query: { page?: unknown; limit?: unknown; lang?: unknown }
+): Promise<{
+  data: VocabularyWordEntry[];
+  pagination: { page: number; limit: number; total: number };
+} | null> {
+  const set = await prisma.vocabularySet.findUnique({ where: { topic_subtopic: { topic, subtopic } } });
+  if (!set) return null;
+
+  const { page, limit, skip } = parsePagination(query);
+  if (set.contentType !== "list") {
+    return { data: [], pagination: { page, limit, total: 0 } };
+  }
+
+  const lang = normalizeLang(query.lang);
+  const [rows, total] = await Promise.all([
+    prisma.vocabularyWord.findMany({
+      where: { setId: set.id },
+      orderBy: { wordIndex: "asc" },
+      skip,
+      take: limit
+    }),
+    prisma.vocabularyWord.count({ where: { setId: set.id } })
+  ]);
+
+  const overlay = await fetchTranslationOverlay(
+    "vocabularyWord",
+    rows.map((word) => word.id),
+    lang
+  );
+  return {
+    data: rows.map((word) => toVocabularyWord(word, lang, overlay.get(word.id))),
+    pagination: { page, limit, total }
   };
 }

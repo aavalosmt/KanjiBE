@@ -43,6 +43,7 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 - `GET /api/manga/:id` — tomo completo con `pages[].dialogues[]` (OCR + morfología ya resuelta por el cliente desktop, ver [`docs/manga-ingest.md`](docs/manga-ingest.md))
 - `GET /api/vocabulary?page=1&limit=20&topic=body` — sets de vocabulario (sin `pages`/`words`)
 - `GET /api/vocabulary/:topic/:subtopic` — set completo: `pages[].entries[]` si es imagen, `words[]` si es lista, más `example_sentences[]` y `layout` (SDUI: columnas/tabla/colapsable/carrusel, ver [`docs/vocabulary-sdui.md`](docs/vocabulary-sdui.md)) (ver [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md))
+- `GET /api/vocabulary/:topic/:subtopic/words?page=1&limit=20` — `words[]` paginado, para sets de lista grandes
 - `GET /api/examples/:topic/:subtopic?lang=` — oraciones de ejemplo de un subtopic (idioma base **inglés**); `404` si el subtopic no está registrado
 - Admin: `GET /api/admin/lrclib/search?q=` y `POST /api/admin/lrclib/import` `{ id }` — busca, sincroniza, tokeniza y guarda
 - `GET /health`
@@ -79,6 +80,7 @@ Protegidos con `X-Admin-Key: <ADMIN_API_KEY>` o `Authorization: Bearer <ADMIN_AP
   - `GET /api/admin/vocabulary`, `PATCH /api/admin/vocabulary/:topic/:subtopic` (title/cover_url/layout — SDUI, ver [`docs/vocabulary-sdui.md`](docs/vocabulary-sdui.md)), `GET /api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex`
   - `PATCH /api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex/entries/:entryIndex`, `PUT .../pages/:pageIndex/image`, `DELETE .../pages/:pageIndex` (formato imagen)
   - `PATCH /api/admin/vocabulary/:topic/:subtopic/words/:wordIndex`, `DELETE .../words/:wordIndex` (formato lista)
+  - `POST /api/admin/vocabulary/:topic/:subtopic/words` — agrega palabras al final de un set existente (no reemplaza, a diferencia de `/ingest`); `GET .../words?page=&limit=` — versión paginada admin
 - Oraciones de ejemplo (atadas a un topic/subtopic registrado, base inglés, ver [`docs/vocabulary-ingest.md`](docs/vocabulary-ingest.md)):
   - `PUT /api/admin/examples/:topic/:subtopic` — reemplazo total `{ sentences: [{ id?, text, furigana, translation, notes? }] }`
   - `PUT /api/admin/examples/:topic/:subtopic/:index/translations/:lang` — overlay por idioma (400 si `lang=en`)

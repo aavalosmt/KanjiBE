@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { toVocabularySet, toVocabularySetSummary } from "../lib/vocabularySerialize.js";
+import {
+  paginatedVocabularyWords,
+  toVocabularySet,
+  toVocabularySetSummary
+} from "../lib/vocabularySerialize.js";
 import { listExampleSentences } from "../lib/exampleSentenceSerialize.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
@@ -57,4 +61,15 @@ vocabularyRouter.get("/:topic/:subtopic", async (req, res) => {
   ]);
 
   res.json(toVocabularySet(set, lang, overlay, exampleSentences));
+});
+
+// Paginated words for a large list-type set, as an alternative to the full
+// (unpaginated) words[] on GET /:topic/:subtopic above.
+vocabularyRouter.get("/:topic/:subtopic/words", async (req, res) => {
+  const result = await paginatedVocabularyWords(req.params.topic, req.params.subtopic, req.query);
+  if (!result) {
+    res.status(404).json({ error: "Vocabulary set not found" });
+    return;
+  }
+  res.json(result);
 });

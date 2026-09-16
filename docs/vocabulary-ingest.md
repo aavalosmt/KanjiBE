@@ -122,6 +122,7 @@ Sin auth, mismo estilo que `/api/stories`, `/api/lyrics` y `/api/manga`:
 
 - `GET /api/vocabulary?page=&limit=&topic=` — resumen de sets (sin `pages`/`words`), filtrable por `topic`
 - `GET /api/vocabulary/:topic/:subtopic` — set completo: `pages[].entries[]` si es `content_type: "image"`, `words[]` si es `content_type: "list"` (el array no aplicable siempre vuelve vacío, no `null`/ausente). Incluye además `example_sentences[]` (ver "Oraciones de ejemplo" abajo) y `layout` (SDUI — cómo renderizar todo lo anterior, ver [`docs/vocabulary-sdui.md`](vocabulary-sdui.md)).
+- `GET /api/vocabulary/:topic/:subtopic/words?page=&limit=&lang=` — página de `words[]` (`{ data, pagination: { page, limit, total } }`), para sets `content_type: "list"` grandes en vez de traer todo con la llamada de arriba. `404` si el set no existe; `data: []`/`total: 0` (no error) si el set existe pero es `content_type: "image"`.
 
 ## 6. Edición / administración
 
@@ -138,6 +139,8 @@ Bajo `/api/admin/vocabulary`, misma auth que la Sección 1:
 | `DELETE` | `/api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex` | Borrar página (formato imagen, cascada a sus entradas) |
 | `PATCH` | `/api/admin/vocabulary/:topic/:subtopic/words/:wordIndex` | Editar una palabra (formato lista): `{ term?, furigana?, translation?, variant? }` — `variant: null` la borra, un objeto la reemplaza, omitido no la toca |
 | `DELETE` | `/api/admin/vocabulary/:topic/:subtopic/words/:wordIndex` | Borrar una palabra (formato lista) |
+| `POST` | `/api/admin/vocabulary/:topic/:subtopic/words` | **Agregar** palabras al final de un set `content_type: "list"` ya existente, sin tocar las que ya tiene — a diferencia de `/ingest`, que siempre reemplaza `words[]` por completo. Body `{ words: [{ term, furigana, translation, variant? }, ...] }` (mismo formato que `/ingest`, hasta 200 por request). `404` si el set no existe (crear el set sigue siendo trabajo de `/ingest`); `400` si es `content_type: "image"`. Responde `{ data: <palabras agregadas>, item_count: <total nuevo> }`. |
+| `GET` | `/api/admin/vocabulary/:topic/:subtopic/words?page=&limit=&lang=` | Igual que la versión pública, con auth admin — útil para paginar el editor en sets grandes |
 
 UI en `/admin` → pestaña **Vocabulario**: lista de sets (filtrable por topic), y por set: el editor de páginas con overlay de cajas (formato imagen) o un editor de filas término/furigana/traducción (formato lista), según corresponda. Borrar sets completos no está cubierto (extensión natural si hace falta).
 

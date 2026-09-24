@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
+import { infoHandler, PUBLIC_AUTH, TOKENIZATION_LOOKUP } from "../lib/endpointInfo.js";
 import { lookupExpression } from "../lib/kuromoji.js";
 import { asString } from "../lib/pagination.js";
 
@@ -9,8 +9,8 @@ const lookupResponseExample = {
   query: "食べた",
   lemma: "食べる",
   lemmas: ["食べる"],
-  reading: "タベル",
-  pos: "verb",
+  reading: "タベタ",
+  pos: "動詞",
   posEn: "verb",
   conjugatedType: "一段",
   conjugatedForm: "連用タ接続",
@@ -18,8 +18,29 @@ const lookupResponseExample = {
   formEn: "past",
   inflectionEn: "past",
   grammarEn: null,
-  lookupKeys: ["食べる"],
-  tokens: []
+  lookupKeys: ["食べた", "食べる"],
+  tokens: [
+    {
+      surface: "食べ",
+      lemma: "食べる",
+      reading: "タベ",
+      pronunciation: "タベ",
+      pos: "動詞",
+      posDetail: "自立",
+      conjugatedType: "一段",
+      conjugatedForm: "連用形"
+    },
+    {
+      surface: "た",
+      lemma: "た",
+      reading: "タ",
+      pronunciation: "タ",
+      pos: "助動詞",
+      posDetail: "",
+      conjugatedType: "特殊・タ",
+      conjugatedForm: "基本形"
+    }
+  ]
 };
 
 async function handleLookup(raw: string | undefined, res: import("express").Response) {
@@ -46,7 +67,9 @@ lookupRouter.get(
       "Busca una expresión japonesa y devuelve su lema, lectura y POS. Equivalente a GET /api/lookup/:q pero vía query string.",
     auth: PUBLIC_AUTH,
     query: { q: "expresión a buscar (alias: text, word), requerido, máx 80 caracteres" },
-    response_example: lookupResponseExample
+    example_request: "GET /api/lookup?q=食べた",
+    response_example: lookupResponseExample,
+    tokenization: TOKENIZATION_LOOKUP
   })
 );
 
@@ -65,7 +88,9 @@ lookupRouter.get(
     description: "Busca una expresión japonesa pasada como segmento de path y devuelve su lema, lectura y POS.",
     auth: PUBLIC_AUTH,
     params: { q: "expresión a buscar, requerido, máx 80 caracteres" },
-    response_example: lookupResponseExample
+    example_request: "GET /api/lookup/食べた",
+    response_example: lookupResponseExample,
+    tokenization: TOKENIZATION_LOOKUP
   })
 );
 

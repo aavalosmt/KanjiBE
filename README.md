@@ -31,7 +31,7 @@ Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a h
 
 ## Auto-documentación (`/info`)
 
-Todo endpoint `GET` tiene un sidecar `GET <ruta>/info` (p. ej. `GET /api/stories/info`, `GET /api/stories/:id/info`, `GET /api/vocabulary/:topic/:subtopic/info`) que devuelve `{ method, path, description, auth, params?, query?, response_example }`. Siempre público, incluso bajo `/api/admin/*` — solo documenta, no expone datos. Ver `src/lib/endpointInfo.ts`.
+Todo endpoint `GET` tiene un sidecar `GET <ruta>/info` (p. ej. `GET /api/stories/info`, `GET /api/stories/:id/info`, `GET /api/vocabulary/:topic/:subtopic/info`) que devuelve `{ method, path, description, auth, params?, query?, example_request, response_example, tokenization? }`. `example_request` es una request lista para copiar y pegar; `tokenization` solo aparece cuando la respuesta incluye datos de tokenización/morfología (kuromoji, o `tokens`/`morphology` provistos por el cliente de ingesta en manga/vocabulario). Siempre público, incluso bajo `/api/admin/*` — solo documenta, no expone datos. Ver `src/lib/endpointInfo.ts`.
 
 ## Endpoints públicos (iOS)
 

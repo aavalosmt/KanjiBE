@@ -57,6 +57,7 @@ adminRouter.get(
     path: "/api/admin/session",
     description: "Verifica la admin key y reporta qué providers de IA están configurados.",
     auth: ADMIN_AUTH,
+    example_request: "GET /api/admin/session",
     response_example: { ok: true, gemini: true, xai: false, defaultProvider: "gemini" }
   })
 );
@@ -68,6 +69,7 @@ adminRouter.get(
     path: "/api/admin/gemini/models",
     description: "Lista modelos Gemini disponibles. 503 si GEMINI_API_KEY no está configurada.",
     auth: ADMIN_AUTH,
+    example_request: "GET /api/admin/gemini/models",
     response_example: { models: [{ name: "models/gemini-2.5-flash", displayName: "Gemini 2.5 Flash" }] }
   })
 );
@@ -80,6 +82,7 @@ adminRouter.get(
     description: "Lista modelos disponibles del provider de IA indicado (gemini o xai). 503 si su API key no está configurada.",
     auth: ADMIN_AUTH,
     query: { provider: "opcional — gemini | xai, default resuelto por config" },
+    example_request: "GET /api/admin/ai/models?provider=gemini",
     response_example: { provider: "gemini", models: [{ name: "models/gemini-2.5-flash", displayName: "Gemini 2.5 Flash" }] }
   })
 );
@@ -92,6 +95,7 @@ adminRouter.get(
     description: "Busca canciones en lrclib.net por texto libre, hasta 20 resultados.",
     auth: ADMIN_AUTH,
     query: { q: "requerido — texto de búsqueda (título/artista)" },
+    example_request: "GET /api/admin/lrclib/search?q=Ayumi%20Miyazaki%20Brave%20Heart",
     response_example: {
       data: [
         {
@@ -117,6 +121,7 @@ adminRouter.get(
     description: "Previsualiza una letra sincronizada de lrclib.net por id, sin importarla todavía.",
     auth: ADMIN_AUTH,
     query: { id: "requerido — id de track en lrclib" },
+    example_request: "GET /api/admin/lrclib/preview?id=12345",
     response_example: { title: "...", artist: "...", blocks: [] }
   })
 );

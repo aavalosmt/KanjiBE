@@ -13,6 +13,7 @@ subtopicsRouter.get(
     description: "Lista subtopics registrados, opcionalmente filtrados por topic.",
     auth: PUBLIC_AUTH,
     query: { topic: "opcional — slug de topic para filtrar (ej. body)" },
+    example_request: "GET /api/subtopics?topic=body",
     response_example: {
       data: [{ id: "clx...", topicSlug: "body", slug: "fingers", label: "Fingers" }]
     }

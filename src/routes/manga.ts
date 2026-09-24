@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
+import { infoHandler, PUBLIC_AUTH, TOKENIZATION_CLIENT_SUPPLIED } from "../lib/endpointInfo.js";
 import { toMangaVolume, toMangaVolumeSummary } from "../lib/mangaSerialize.js";
 import { parsePagination } from "../lib/pagination.js";
 
@@ -14,6 +14,7 @@ mangaRouter.get(
     description: "Lista resúmenes de volúmenes de manga, paginado.",
     auth: PUBLIC_AUTH,
     query: { page: "opcional, default 1", limit: "opcional, default 20, máx 100" },
+    example_request: "GET /api/manga?page=1&limit=20",
     response_example: {
       data: [
         {
@@ -59,6 +60,7 @@ mangaRouter.get(
     description: "Devuelve un volumen de manga completo, con sus páginas y diálogos posicionados.",
     auth: PUBLIC_AUTH,
     params: { id: "requerido — id del volumen" },
+    example_request: "GET /api/manga/vol_1",
     response_example: {
       id: "vol_1",
       title: "...",
@@ -75,10 +77,11 @@ mangaRouter.get(
           image_checksum: "sha256:...",
           width: 1600,
           height: 2400,
-          dialogues: [{ dialogue_index: 0, dialogue_box: { x: 0, y: 0, width: 0, height: 0 }, full_text: "...", tokens: [], furigana: "...", morphology: [] }]
+          dialogues: [{ dialogue_index: 0, dialogue_box: { x: 0, y: 0, width: 0, height: 0 }, full_text: "頭", tokens: ["頭"], furigana: "[頭](furigana:あたま)", morphology: [{ surface: "頭", pos: "noun" }] }]
         }
       ]
-    }
+    },
+    tokenization: TOKENIZATION_CLIENT_SUPPLIED
   })
 );
 

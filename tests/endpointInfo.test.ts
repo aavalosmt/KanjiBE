@@ -56,4 +56,78 @@ describe("GET /info sidecars", () => {
     expect(byPath.status).toBe(200);
     expect(byPath.body.path).toBe("/api/lookup/:q");
   });
+
+  const ALL_INFO_PATHS = [
+    "/api/stories/info",
+    "/api/stories/x/info",
+    "/api/lyrics/info",
+    "/api/lyrics/x/info",
+    "/api/conversations/info",
+    "/api/conversations/x/info",
+    "/api/topics/info",
+    "/api/subtopics/info",
+    "/api/kanji/info",
+    "/api/lookup/info",
+    "/api/lookup/x/info",
+    "/api/analyze/info",
+    "/api/manga/info",
+    "/api/manga/x/info",
+    "/api/vocabulary/info",
+    "/api/vocabulary/x/y/info",
+    "/api/vocabulary/x/y/words/info",
+    "/api/examples/x/y/info",
+    "/api/admin/session/info",
+    "/api/admin/gemini/models/info",
+    "/api/admin/ai/models/info",
+    "/api/admin/lrclib/search/info",
+    "/api/admin/lrclib/preview/info",
+    "/api/admin/manga/info",
+    "/api/admin/manga/x/info",
+    "/api/admin/manga/x/pages/0/info",
+    "/api/admin/vocabulary/info",
+    "/api/admin/vocabulary/x/y/info",
+    "/api/admin/vocabulary/x/y/words/info",
+    "/api/admin/vocabulary/x/y/pages/0/info",
+    "/api/admin/examples/x/y/info"
+  ];
+
+  it.each(ALL_INFO_PATHS)("%s has a runnable example_request", async (path) => {
+    const res = await request(app).get(path);
+    expect(res.status).toBe(200);
+    expect(typeof res.body.example_request).toBe("string");
+    expect(res.body.example_request).toMatch(/^GET \//);
+  });
+
+  const TOKENIZATION_PATHS = [
+    "/api/analyze/info",
+    "/api/lookup/info",
+    "/api/lookup/x/info",
+    "/api/stories/x/info",
+    "/api/lyrics/x/info",
+    "/api/conversations/x/info",
+    "/api/manga/x/info",
+    "/api/vocabulary/x/y/info",
+    "/api/admin/manga/x/info",
+    "/api/admin/manga/x/pages/0/info",
+    "/api/admin/vocabulary/x/y/info",
+    "/api/admin/vocabulary/x/y/pages/0/info"
+  ];
+
+  it.each(TOKENIZATION_PATHS)("%s documents its tokenization rules", async (path) => {
+    const res = await request(app).get(path);
+    expect(res.status).toBe(200);
+    expect(typeof res.body.tokenization).toBe("string");
+    expect(res.body.tokenization.length).toBeGreaterThan(0);
+  });
+
+  it("omits tokenization on endpoints that don't tokenize anything", async () => {
+    const list = await request(app).get("/api/stories/info");
+    expect(list.body.tokenization).toBeUndefined();
+
+    const words = await request(app).get("/api/vocabulary/x/y/words/info");
+    expect(words.body.tokenization).toBeUndefined();
+
+    const topics = await request(app).get("/api/topics/info");
+    expect(topics.body.tokenization).toBeUndefined();
+  });
 });

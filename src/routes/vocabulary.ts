@@ -6,7 +6,7 @@ import {
   toVocabularySetSummary
 } from "../lib/vocabularySerialize.js";
 import { listExampleSentences } from "../lib/exampleSentenceSerialize.js";
-import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
+import { infoHandler, PUBLIC_AUTH, TOKENIZATION_CLIENT_SUPPLIED_IMAGE_ONLY } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
 
@@ -24,6 +24,7 @@ vocabularyRouter.get(
       limit: "opcional, default 20, máx 100",
       topic: "opcional — slug de topic registrado"
     },
+    example_request: "GET /api/vocabulary?page=1&limit=20&topic=body",
     response_example: {
       data: [
         {
@@ -75,6 +76,7 @@ vocabularyRouter.get(
     auth: PUBLIC_AUTH,
     params: { topic: "requerido", subtopic: "requerido" },
     query: { lang: "opcional — locale para la traducción overlay de words, default es" },
+    example_request: "GET /api/vocabulary/body/fingers?lang=es",
     response_example: {
       id: "set_1",
       topic: "body",
@@ -89,7 +91,8 @@ vocabularyRouter.get(
       words: [{ word_index: 0, term: "指", furigana: "[指](furigana:ゆび)", translation: "finger", translationLang: "es" }],
       example_sentences: [],
       layout: { type: "grid" }
-    }
+    },
+    tokenization: TOKENIZATION_CLIENT_SUPPLIED_IMAGE_ONLY
   })
 );
 
@@ -137,6 +140,7 @@ vocabularyRouter.get(
       limit: "opcional, default 20, máx 100",
       lang: "opcional — locale para la traducción overlay, default es"
     },
+    example_request: "GET /api/vocabulary/body/fingers/words?page=1&limit=20&lang=es",
     response_example: {
       data: [{ word_index: 0, term: "指", furigana: "[指](furigana:ゆび)", translation: "finger", translationLang: "es" }],
       pagination: { page: 1, limit: 20, total: 12 }

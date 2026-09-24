@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
-import { ADMIN_AUTH, infoHandler } from "../lib/endpointInfo.js";
+import { ADMIN_AUTH, infoHandler, TOKENIZATION_CLIENT_SUPPLIED } from "../lib/endpointInfo.js";
 import { toMangaDialogue, toMangaPage, toMangaVolume, toMangaVolumeSummary } from "../lib/mangaSerialize.js";
 import { MANGA_IMAGE_MIME_TYPES, storeMangaImage } from "../lib/mangaStorage.js";
 import { parsePagination } from "../lib/pagination.js";
@@ -26,6 +26,7 @@ mangaAdminRouter.get(
     description: "Lista resúmenes de volúmenes de manga (vista admin, idéntica a GET /api/manga).",
     auth: ADMIN_AUTH,
     query: { page: "opcional, default 1", limit: "opcional, default 20, máx 100" },
+    example_request: "GET /api/admin/manga?page=1&limit=20",
     response_example: {
       data: [{ id: "vol_1", title: "...", volume_number: 1, total_pages: 180, cover_url: null, page_count: 12 }],
       pagination: { page: 1, limit: 20, total: 3 }
@@ -41,11 +42,21 @@ mangaAdminRouter.get(
     description: "Devuelve un volumen de manga completo con páginas y diálogos (vista admin).",
     auth: ADMIN_AUTH,
     params: { id: "requerido — id del volumen" },
+    example_request: "GET /api/admin/manga/vol_1",
     response_example: {
       id: "vol_1",
       title: "...",
-      pages: [{ page_index: 0, image_url: "...", width: 1600, height: 2400, dialogues: [] }]
-    }
+      pages: [
+        {
+          page_index: 0,
+          image_url: "...",
+          width: 1600,
+          height: 2400,
+          dialogues: [{ dialogue_index: 0, dialogue_box: { x: 0, y: 0, width: 0, height: 0 }, full_text: "頭", tokens: ["頭"], furigana: "[頭](furigana:あたま)", morphology: [{ surface: "頭", pos: "noun" }] }]
+        }
+      ]
+    },
+    tokenization: TOKENIZATION_CLIENT_SUPPLIED
   })
 );
 
@@ -57,14 +68,16 @@ mangaAdminRouter.get(
     description: "Devuelve el detalle de una página de manga (imagen + diálogos) para editarla.",
     auth: ADMIN_AUTH,
     params: { id: "requerido — id del volumen", pageIndex: "requerido — índice de página, entero desde 0" },
+    example_request: "GET /api/admin/manga/vol_1/pages/0",
     response_example: {
       page_index: 0,
       image_url: "https://.../p000.webp",
       image_checksum: "sha256:...",
       width: 1600,
       height: 2400,
-      dialogues: [{ dialogue_index: 0, dialogue_box: { x: 0, y: 0, width: 0, height: 0 }, full_text: "...", tokens: [], furigana: "...", morphology: [] }]
-    }
+      dialogues: [{ dialogue_index: 0, dialogue_box: { x: 0, y: 0, width: 0, height: 0 }, full_text: "頭", tokens: ["頭"], furigana: "[頭](furigana:あたま)", morphology: [{ surface: "頭", pos: "noun" }] }]
+    },
+    tokenization: TOKENIZATION_CLIENT_SUPPLIED
   })
 );
 

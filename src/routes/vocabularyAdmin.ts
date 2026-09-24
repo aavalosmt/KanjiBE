@@ -11,7 +11,12 @@ import {
   toVocabularyWord
 } from "../lib/vocabularySerialize.js";
 import { listExampleSentences } from "../lib/exampleSentenceSerialize.js";
-import { ADMIN_AUTH, infoHandler } from "../lib/endpointInfo.js";
+import {
+  ADMIN_AUTH,
+  infoHandler,
+  TOKENIZATION_CLIENT_SUPPLIED,
+  TOKENIZATION_CLIENT_SUPPLIED_IMAGE_ONLY
+} from "../lib/endpointInfo.js";
 import { VOCABULARY_IMAGE_MIME_TYPES, storeVocabularyImage } from "../lib/vocabularyStorage.js";
 import { unknownSubtopicMessage, unknownTopicMessage } from "../lib/taxonomy.js";
 import { parsePagination } from "../lib/pagination.js";
@@ -46,6 +51,7 @@ vocabularyAdminRouter.get(
     description: "Lista resúmenes de sets de vocabulario (vista admin, sin filtro por topic).",
     auth: ADMIN_AUTH,
     query: { page: "opcional, default 1", limit: "opcional, default 20, máx 100" },
+    example_request: "GET /api/admin/vocabulary?page=1&limit=20",
     response_example: {
       data: [{ id: "set_1", topic: "body", subtopic: "fingers", content_type: "list", title: "Fingers", item_count: 12 }],
       pagination: { page: 1, limit: 20, total: 7 }
@@ -62,6 +68,7 @@ vocabularyAdminRouter.get(
     auth: ADMIN_AUTH,
     params: { topic: "requerido", subtopic: "requerido" },
     query: { lang: "opcional — locale para la traducción overlay de words, default es" },
+    example_request: "GET /api/admin/vocabulary/body/fingers?lang=es",
     response_example: {
       id: "set_1",
       topic: "body",
@@ -72,7 +79,8 @@ vocabularyAdminRouter.get(
       words: [{ word_index: 0, term: "指", furigana: "[指](furigana:ゆび)", translation: "finger" }],
       example_sentences: [],
       layout: { type: "grid" }
-    }
+    },
+    tokenization: TOKENIZATION_CLIENT_SUPPLIED_IMAGE_ONLY
   })
 );
 
@@ -89,6 +97,7 @@ vocabularyAdminRouter.get(
       limit: "opcional, default 20, máx 100",
       lang: "opcional — locale para la traducción overlay, default es"
     },
+    example_request: "GET /api/admin/vocabulary/body/fingers/words?page=1&limit=20&lang=es",
     response_example: {
       data: [{ word_index: 0, term: "指", furigana: "[指](furigana:ゆび)", translation: "finger" }],
       pagination: { page: 1, limit: 20, total: 12 }
@@ -104,14 +113,16 @@ vocabularyAdminRouter.get(
     description: "Devuelve el detalle de una página de un set content_type: image (imagen + entries) para editarla.",
     auth: ADMIN_AUTH,
     params: { topic: "requerido", subtopic: "requerido", pageIndex: "requerido — índice de página, entero desde 0" },
+    example_request: "GET /api/admin/vocabulary/body/general/pages/0",
     response_example: {
       page_index: 0,
       image_url: "https://.../p000.webp",
       image_checksum: "sha256:...",
       width: 1600,
       height: 2400,
-      entries: [{ entry_index: 0, entry_box: { x: 0, y: 0, width: 0, height: 0 }, full_text: "頭", tokens: ["頭"], furigana: "...", morphology: [] }]
-    }
+      entries: [{ entry_index: 0, entry_box: { x: 0, y: 0, width: 0, height: 0 }, full_text: "頭", tokens: ["頭"], furigana: "[頭](furigana:あたま)", morphology: [{ surface: "頭", pos: "noun" }] }]
+    },
+    tokenization: TOKENIZATION_CLIENT_SUPPLIED
   })
 );
 

@@ -15,6 +15,7 @@ examplesRouter.get(
     auth: PUBLIC_AUTH,
     params: { topic: "requerido — slug de topic registrado", subtopic: "requerido — slug de subtopic registrado" },
     query: { lang: "opcional — locale para la traducción overlay, default en" },
+    example_request: "GET /api/examples/body/fingers?lang=es",
     response_example: {
       topic: "body",
       subtopic: "fingers",

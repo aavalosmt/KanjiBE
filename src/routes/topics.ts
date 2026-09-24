@@ -11,6 +11,7 @@ topicsRouter.get(
     path: "/api/topics",
     description: "Lista todos los topics registrados (taxonomía compartida con vocabulary/conversations/examples).",
     auth: PUBLIC_AUTH,
+    example_request: "GET /api/topics",
     response_example: {
       data: [{ id: "clx...", slug: "body", label: "Body" }]
     }

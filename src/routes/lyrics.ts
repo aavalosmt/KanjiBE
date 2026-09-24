@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
+import { infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toLyric, toLyricSummary } from "../lib/serialize.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
@@ -20,6 +20,7 @@ lyricsRouter.get(
       level: "opcional — filtra por nivel",
       lang: "opcional — locale para la traducción overlay, default es"
     },
+    example_request: "GET /api/lyrics?page=1&limit=20&level=N4",
     response_example: {
       data: [
         {
@@ -84,6 +85,7 @@ lyricsRouter.get(
     auth: PUBLIC_AUTH,
     params: { id: "requerido — id de la letra" },
     query: { lang: "opcional — locale para la traducción overlay, default es" },
+    example_request: "GET /api/lyrics/lyric_1?lang=en",
     response_example: {
       id: "lyric_1",
       title: "...",
@@ -93,10 +95,20 @@ lyricsRouter.get(
       translationLang: "es",
       coverUrl: null,
       youtubeUrl: null,
-      blocks: [{ id: "b1", type: "text", content: "...", translation: "...", startTime: 0 }],
+      blocks: [
+        {
+          id: "b1",
+          type: "text",
+          content: "食べました",
+          translation: "...",
+          startTime: 0,
+          tokens: [{ surface: "食べました", lemma: "食べる", reading: "タベマシタ", pos: "動詞", colorType: "verb", color: "#10B981" }]
+        }
+      ],
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z"
-    }
+    },
+    tokenization: `Solo en bloques type: "text" | "header" | "dialogue" con content. ${TOKENIZATION_ANALYZE}`
   })
 );
 

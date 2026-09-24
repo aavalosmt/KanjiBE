@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
+import { infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toConversation, toConversationSummary } from "../lib/serialize.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
@@ -21,6 +21,7 @@ conversationsRouter.get(
       level: "opcional — filtra por nivel",
       lang: "opcional — locale para la traducción overlay, default es"
     },
+    example_request: "GET /api/conversations?page=1&limit=20&topic=body&level=N5",
     response_example: {
       data: [
         {
@@ -87,6 +88,7 @@ conversationsRouter.get(
     auth: PUBLIC_AUTH,
     params: { id: "requerido — id de la conversación" },
     query: { lang: "opcional — locale para la traducción overlay, default es" },
+    example_request: "GET /api/conversations/conv_1?lang=en",
     response_example: {
       id: "conv_1",
       title: "...",
@@ -95,10 +97,20 @@ conversationsRouter.get(
       translation: "...",
       translationLang: "es",
       coverUrl: null,
-      blocks: [{ id: "b1", type: "dialogue", content: "...", translation: "..." }],
+      blocks: [
+        {
+          id: "b1",
+          type: "dialogue",
+          speaker: "A",
+          content: "食べました",
+          translation: "...",
+          tokens: [{ surface: "食べました", lemma: "食べる", reading: "タベマシタ", pos: "動詞", colorType: "verb", color: "#10B981" }]
+        }
+      ],
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z"
-    }
+    },
+    tokenization: `Solo en bloques type: "text" | "header" | "dialogue" con content. ${TOKENIZATION_ANALYZE}`
   })
 );
 

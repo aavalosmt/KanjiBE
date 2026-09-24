@@ -20,6 +20,7 @@ kanjiRouter.get(
       page: "opcional, default 1",
       limit: "opcional, default 20, máx 100"
     },
+    example_request: "GET /api/kanji?level=5&page=1&limit=20",
     response_example: {
       data: [
         {

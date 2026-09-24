@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
+import { infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
 import { analyzeBlock } from "../lib/kuromoji.js";
 import { asString } from "../lib/pagination.js";
 
@@ -14,10 +14,29 @@ analyzeRouter.get(
       "Tokeniza un bloque de texto japonés (kuromoji) y devuelve sus tokens con lectura/POS. Mismo comportamiento que POST /api/analyze pero vía query string.",
     auth: PUBLIC_AUTH,
     query: { text: "texto a analizar (alias: q), requerido, máx 4000 caracteres" },
+    example_request: "GET /api/analyze?text=食べました",
     response_example: {
-      text: "食べた",
-      tokens: [{ surface: "食べ", lemma: "食べる", reading: "タベ", pos: "verb", colorType: "verb", color: "#10B981" }]
-    }
+      text: "食べました",
+      tokens: [
+        {
+          surface: "食べました",
+          reading: "タベマシタ",
+          lemma: "食べる",
+          pos: "動詞",
+          posDetail: "自立",
+          conjugatedType: "一段",
+          conjugatedForm: "連用形",
+          colorType: "verb",
+          color: "#10B981",
+          parts: [
+            { surface: "食べ", lemma: "食べる", reading: "タベ", pos: "動詞" },
+            { surface: "まし", lemma: "ます", reading: "マシ", pos: "助動詞" },
+            { surface: "た", lemma: "た", reading: "タ", pos: "助動詞" }
+          ]
+        }
+      ]
+    },
+    tokenization: TOKENIZATION_ANALYZE
   })
 );
 

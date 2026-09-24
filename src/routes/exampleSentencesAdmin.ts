@@ -35,6 +35,7 @@ exampleSentencesAdminRouter.get(
     auth: ADMIN_AUTH,
     params: { topic: "requerido", subtopic: "requerido" },
     query: { lang: "opcional — locale para la traducción overlay, default en" },
+    example_request: "GET /api/admin/examples/body/fingers?lang=es",
     response_example: {
       topic: "body",
       subtopic: "fingers",

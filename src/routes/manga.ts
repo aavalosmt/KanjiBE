@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH, TOKENIZATION_CLIENT_SUPPLIED } from "../lib/endpointInfo.js";
+import { ADMIN_AUTH, infoHandler, PUBLIC_AUTH, TOKENIZATION_CLIENT_SUPPLIED } from "../lib/endpointInfo.js";
 import { toMangaVolume, toMangaVolumeSummary } from "../lib/mangaSerialize.js";
 import { parsePagination } from "../lib/pagination.js";
 
@@ -29,6 +29,39 @@ mangaRouter.get(
         }
       ],
       pagination: { page: 1, limit: 20, total: 3 }
+    },
+    create: {
+      method: "POST",
+      path: "/api/admin/manga/ingest",
+      description:
+        "Crea o reemplaza (upsert por volume_id) un tomo completo con sus páginas y diálogos. Sube cada imagen de página antes con POST /api/admin/manga/upload-image y usa su image_url/image_checksum aquí. Detalle completo en docs/manga-ingest.md.",
+      auth: ADMIN_AUTH,
+      body_example: {
+        schema_version: "1.0",
+        volume_id: "9f9a4e2e-9f4a-4b7a-9f9a-4e2e9f4a4b7a",
+        title: "...",
+        volume_number: "1",
+        total_pages: 180,
+        cover_url: "https://.../cover.webp",
+        pages: [
+          {
+            page_index: 0,
+            image_url: "https://.../p000.webp",
+            image_checksum: "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a1",
+            width: 1600,
+            height: 2400,
+            dialogues: [
+              {
+                dialogue_box: { x: 120, y: 340, width: 220, height: 90 },
+                full_text: "頭",
+                tokens: ["頭"],
+                furigana: "[頭](furigana:あたま)",
+                morphology: [{ surface: "頭", pos: "noun" }]
+              }
+            ]
+          }
+        ]
+      }
     }
   })
 );

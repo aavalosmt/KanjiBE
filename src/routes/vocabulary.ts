@@ -6,7 +6,12 @@ import {
   toVocabularySetSummary
 } from "../lib/vocabularySerialize.js";
 import { listExampleSentences } from "../lib/exampleSentenceSerialize.js";
-import { infoHandler, PUBLIC_AUTH, TOKENIZATION_CLIENT_SUPPLIED_IMAGE_ONLY } from "../lib/endpointInfo.js";
+import {
+  ADMIN_AUTH,
+  infoHandler,
+  PUBLIC_AUTH,
+  TOKENIZATION_CLIENT_SUPPLIED_IMAGE_ONLY
+} from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
 
@@ -40,6 +45,24 @@ vocabularyRouter.get(
         }
       ],
       pagination: { page: 1, limit: 20, total: 7 }
+    },
+    create: {
+      method: "POST",
+      path: "/api/admin/vocabulary/ingest",
+      description:
+        'Crea o reemplaza (upsert por topic+subtopic) un set de vocabulario completo. content_type: "list" es un array plano de palabras; content_type: "image" son páginas con cajas posicionadas (requiere subir la imagen antes con POST /api/admin/vocabulary/upload-image y pasar su image_url). topic/subtopic deben ser slugs ya registrados. Detalle completo en docs/vocabulary-ingest.md.',
+      auth: ADMIN_AUTH,
+      body_example: {
+        schema_version: "1.0",
+        topic: "body",
+        subtopic: "fingers",
+        title: "Fingers",
+        content_type: "list",
+        words: [
+          { term: "指", furigana: "[指](furigana:ゆび)", translation: "finger" },
+          { term: "親指", furigana: "[親指](furigana:おや.ゆび)", translation: "thumb" }
+        ]
+      }
     }
   })
 );

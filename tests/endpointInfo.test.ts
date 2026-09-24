@@ -1,8 +1,9 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 
 const app = createApp();
+const admin = { "x-admin-key": "test-admin-key" };
 
 describe("GET /info sidecars", () => {
   it("documents a root list endpoint without admin auth", async () => {
@@ -129,5 +130,106 @@ describe("GET /info sidecars", () => {
 
     const topics = await request(app).get("/api/topics/info");
     expect(topics.body.tokenization).toBeUndefined();
+  });
+
+  const CREATE_PATHS = [
+    "/api/stories/info",
+    "/api/lyrics/info",
+    "/api/conversations/info",
+    "/api/topics/info",
+    "/api/subtopics/info",
+    "/api/vocabulary/info",
+    "/api/manga/info",
+    "/api/admin/vocabulary/info",
+    "/api/admin/manga/info"
+  ];
+
+  it.each(CREATE_PATHS)("%s points at the POST that creates the resource", async (path) => {
+    const res = await request(app).get(path);
+    expect(res.status).toBe(200);
+    expect(res.body.create.method).toBe("POST");
+    expect(typeof res.body.create.path).toBe("string");
+    expect(res.body.create.path).toMatch(/^\/api\/admin\//);
+    expect(res.body.create.body_example).toBeTruthy();
+  });
+
+  it("omits create on detail/PUT-only/words endpoints", async () => {
+    const detail = await request(app).get("/api/stories/x/info");
+    expect(detail.body.create).toBeUndefined();
+
+    const words = await request(app).get("/api/vocabulary/x/y/words/info");
+    expect(words.body.create).toBeUndefined();
+
+    const examples = await request(app).get("/api/examples/x/y/info");
+    expect(examples.body.create).toBeUndefined();
+  });
+});
+
+describe("create.body_example actually satisfies its own endpoint's validator", () => {
+  beforeAll(async () => {
+    // Prerequisites the doc examples assume are already registered, tolerating
+    // a prior run having created them (409).
+    await request(app).post("/api/admin/topics").set(admin).send({ slug: "body", label: "Body" });
+    await request(app)
+      .post("/api/admin/subtopics")
+      .set(admin)
+      .send({ topicSlug: "body", slug: "fingers", label: "Fingers" });
+    await request(app)
+      .post("/api/admin/topics")
+      .set(admin)
+      .send({ slug: "convenience_store", label: "Convenience store" });
+  });
+
+  it("POST /api/admin/topics accepts the documented body", async () => {
+    const info = await request(app).get("/api/topics/info");
+    const body = { ...info.body.create.body_example, slug: "info_doc_topic" };
+    const res = await request(app).post("/api/admin/topics").set(admin).send(body);
+    expect(res.status).toBe(201);
+  });
+
+  it("POST /api/admin/subtopics accepts the documented body", async () => {
+    const info = await request(app).get("/api/subtopics/info");
+    const body = { ...info.body.create.body_example, slug: "info_doc_subtopic" };
+    const res = await request(app).post("/api/admin/subtopics").set(admin).send(body);
+    expect(res.status).toBe(201);
+  });
+
+  it("POST /api/admin/stories accepts the documented body", async () => {
+    const info = await request(app).get("/api/stories/info");
+    const body = { ...info.body.create.body_example, id: "info-doc-story" };
+    const res = await request(app).post("/api/admin/stories").set(admin).send(body);
+    expect(res.status).toBe(201);
+  });
+
+  it("POST /api/admin/lyrics accepts the documented body", async () => {
+    const info = await request(app).get("/api/lyrics/info");
+    const body = { ...info.body.create.body_example, id: "info-doc-lyric" };
+    const res = await request(app).post("/api/admin/lyrics").set(admin).send(body);
+    expect(res.status).toBe(201);
+  });
+
+  it("POST /api/admin/conversations accepts the documented body", async () => {
+    const info = await request(app).get("/api/conversations/info");
+    const body = { ...info.body.create.body_example, id: "info-doc-conversation" };
+    const res = await request(app).post("/api/admin/conversations").set(admin).send(body);
+    expect(res.status).toBe(201);
+  });
+
+  it("POST /api/admin/vocabulary/ingest accepts the documented body", async () => {
+    const info = await request(app).get("/api/vocabulary/info");
+    const res = await request(app)
+      .post("/api/admin/vocabulary/ingest")
+      .set(admin)
+      .send(info.body.create.body_example);
+    expect(res.status).toBe(200);
+  });
+
+  it("POST /api/admin/manga/ingest accepts the documented body", async () => {
+    const info = await request(app).get("/api/manga/info");
+    const res = await request(app)
+      .post("/api/admin/manga/ingest")
+      .set(admin)
+      .send(info.body.create.body_example);
+    expect(res.status).toBe(200);
   });
 });

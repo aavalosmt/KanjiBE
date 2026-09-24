@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
+import { ADMIN_AUTH, infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toStory, toStorySummary } from "../lib/serialize.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
@@ -33,6 +33,23 @@ storiesRouter.get(
         }
       ],
       pagination: { page: 1, limit: 20, total: 42 }
+    },
+    create: {
+      method: "POST",
+      path: "/api/admin/stories",
+      description: "Crea una historia nueva con sus blocks. 409 si id ya existe.",
+      auth: ADMIN_AUTH,
+      body_example: {
+        id: "story_1",
+        title: "本文",
+        level: "N5",
+        translation: "Texto principal",
+        coverUrl: "https://cdn.tuapp.com/covers/story1.jpg",
+        blocks: [
+          { id: "b1", type: "text", content: "食べました。", translation: "Comí." },
+          { id: "b2", type: "image", url: "https://cdn.tuapp.com/img.jpg", caption: "..." }
+        ]
+      }
     }
   })
 );

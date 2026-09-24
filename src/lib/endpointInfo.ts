@@ -4,6 +4,18 @@ export const PUBLIC_AUTH = "None";
 export const ADMIN_AUTH =
   "Admin required: header X-Admin-Key: <ADMIN_API_KEY> or Authorization: Bearer <ADMIN_API_KEY>";
 
+// Points a read endpoint's /info at the POST that creates/ingests the
+// resource it lists, with a ready-to-send example body — so "how do I get
+// this data in here" is answered right next to "here's what it looks like
+// once it's in".
+export interface RelatedWriteInfo {
+  method: "POST";
+  path: string;
+  description: string;
+  auth: string;
+  body_example: unknown;
+}
+
 export interface EndpointInfo {
   method: "GET";
   path: string;
@@ -19,6 +31,10 @@ export interface EndpointInfo {
   // manga/vocabulary "image" entries) — explains where that data comes from
   // and the rules used to produce it.
   tokenization?: string;
+  // Only set on the list endpoint of a resource that has a creation/ingest
+  // POST (stories, lyrics, conversations, topics, subtopics, vocabulary,
+  // manga) — not on every endpoint, and not on PUT/PATCH/DELETE endpoints.
+  create?: RelatedWriteInfo;
 }
 
 // Shared prose blocks so the same pipeline is described identically everywhere

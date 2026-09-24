@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
+import { ADMIN_AUTH, infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
 import { asString } from "../lib/pagination.js";
 
 export const subtopicsRouter = Router();
@@ -16,6 +16,14 @@ subtopicsRouter.get(
     example_request: "GET /api/subtopics?topic=body",
     response_example: {
       data: [{ id: "clx...", topicSlug: "body", slug: "fingers", label: "Fingers" }]
+    },
+    create: {
+      method: "POST",
+      path: "/api/admin/subtopics",
+      description:
+        "Registra un subtopic nuevo bajo un topic ya existente. slug en snake_case; 400 si el topic no existe, 409 si (topicSlug, slug) ya existe.",
+      auth: ADMIN_AUTH,
+      body_example: { topicSlug: "body", slug: "fingers", label: "Fingers" }
     }
   })
 );

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
+import { ADMIN_AUTH, infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toConversation, toConversationSummary } from "../lib/serialize.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
@@ -35,6 +35,23 @@ conversationsRouter.get(
         }
       ],
       pagination: { page: 1, limit: 20, total: 5 }
+    },
+    create: {
+      method: "POST",
+      path: "/api/admin/conversations",
+      description: "Crea una conversación nueva con sus blocks. topic debe ser un slug ya registrado (POST /api/admin/topics); 400 si no. 409 si id ya existe.",
+      auth: ADMIN_AUTH,
+      body_example: {
+        id: "conv_1",
+        title: "コンビニで",
+        topic: "convenience_store",
+        level: "N4",
+        translation: "En la tienda de conveniencia",
+        coverUrl: null,
+        blocks: [
+          { id: "b1", type: "dialogue", speaker: "店員", content: "いらっしゃいませ。", translation: "¡Bienvenido!" }
+        ]
+      }
     }
   })
 );

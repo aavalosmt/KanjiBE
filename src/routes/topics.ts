@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
+import { ADMIN_AUTH, infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
 
 export const topicsRouter = Router();
 
@@ -14,6 +14,13 @@ topicsRouter.get(
     example_request: "GET /api/topics",
     response_example: {
       data: [{ id: "clx...", slug: "body", label: "Body" }]
+    },
+    create: {
+      method: "POST",
+      path: "/api/admin/topics",
+      description: "Registra un topic nuevo. slug debe ser snake_case y único; 409 si ya existe.",
+      auth: ADMIN_AUTH,
+      body_example: { slug: "body", label: "Body" }
     }
   })
 );

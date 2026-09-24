@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
+import { ADMIN_AUTH, infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toLyric, toLyricSummary } from "../lib/serialize.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
@@ -35,6 +35,21 @@ lyricsRouter.get(
         }
       ],
       pagination: { page: 1, limit: 20, total: 10 }
+    },
+    create: {
+      method: "POST",
+      path: "/api/admin/lyrics",
+      description: "Crea una letra nueva con sus blocks sincronizados. 409 si id ya existe. Alternativa: POST /api/admin/lrclib/import para traerla de lrclib.net.",
+      auth: ADMIN_AUTH,
+      body_example: {
+        id: "song_456",
+        title: "Brave Heart",
+        artist: "Ayumi Miyazaki",
+        translation: "Corazón Valiente",
+        coverUrl: "https://cdn.tuapp.com/covers/song456.jpg",
+        youtubeUrl: "https://youtube.com/watch?v=...",
+        blocks: [{ id: "b1", type: "text", content: "食べました。", translation: "Comí.", startTime: 12.5 }]
+      }
     }
   })
 );

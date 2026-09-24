@@ -1,8 +1,26 @@
 import { Router } from "express";
+import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
 import { lookupExpression } from "../lib/kuromoji.js";
 import { asString } from "../lib/pagination.js";
 
 export const lookupRouter = Router();
+
+const lookupResponseExample = {
+  query: "食べた",
+  lemma: "食べる",
+  lemmas: ["食べる"],
+  reading: "タベル",
+  pos: "verb",
+  posEn: "verb",
+  conjugatedType: "一段",
+  conjugatedForm: "連用タ接続",
+  verbClassEn: "ichidan",
+  formEn: "past",
+  inflectionEn: "past",
+  grammarEn: null,
+  lookupKeys: ["食べる"],
+  tokens: []
+};
 
 async function handleLookup(raw: string | undefined, res: import("express").Response) {
   const query = raw?.trim();
@@ -19,12 +37,37 @@ async function handleLookup(raw: string | undefined, res: import("express").Resp
   res.json(result);
 }
 
+lookupRouter.get(
+  "/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/lookup",
+    description:
+      "Busca una expresión japonesa y devuelve su lema, lectura y POS. Equivalente a GET /api/lookup/:q pero vía query string.",
+    auth: PUBLIC_AUTH,
+    query: { q: "expresión a buscar (alias: text, word), requerido, máx 80 caracteres" },
+    response_example: lookupResponseExample
+  })
+);
+
 lookupRouter.get("/", async (req, res) => {
   await handleLookup(
     asString(req.query.q) ?? asString(req.query.text) ?? asString(req.query.word),
     res
   );
 });
+
+lookupRouter.get(
+  "/:q/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/lookup/:q",
+    description: "Busca una expresión japonesa pasada como segmento de path y devuelve su lema, lectura y POS.",
+    auth: PUBLIC_AUTH,
+    params: { q: "expresión a buscar, requerido, máx 80 caracteres" },
+    response_example: lookupResponseExample
+  })
+);
 
 lookupRouter.get("/:q", async (req, res) => {
   await handleLookup(req.params.q, res);

@@ -7,6 +7,7 @@ import {
   resolveProvider
 } from "../lib/ai.js";
 import { listExampleSentences } from "../lib/exampleSentenceSerialize.js";
+import { ADMIN_AUTH, infoHandler } from "../lib/endpointInfo.js";
 import { unknownSubtopicMessage, unknownTopicMessage } from "../lib/taxonomy.js";
 import {
   EXAMPLE_SENTENCE_BASE_LANG,
@@ -22,6 +23,25 @@ import {
 } from "../validators.js";
 
 export const exampleSentencesAdminRouter = Router();
+
+// Registered before requireAdmin below so /info stays public even though the
+// endpoint it documents requires admin auth — it only describes usage.
+exampleSentencesAdminRouter.get(
+  "/:topic/:subtopic/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/examples/:topic/:subtopic",
+    description: "Lista las frases de ejemplo de un (topic, subtopic) (vista admin, idéntico a GET /api/examples/:topic/:subtopic).",
+    auth: ADMIN_AUTH,
+    params: { topic: "requerido", subtopic: "requerido" },
+    query: { lang: "opcional — locale para la traducción overlay, default en" },
+    response_example: {
+      topic: "body",
+      subtopic: "fingers",
+      data: [{ sentence_index: 0, text: "指が痛い。", furigana: "...", translation: "My finger hurts.", translationLang: "en" }]
+    }
+  })
+);
 
 exampleSentencesAdminRouter.use(requireAdmin);
 

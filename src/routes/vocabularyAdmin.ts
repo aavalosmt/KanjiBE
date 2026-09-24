@@ -11,6 +11,7 @@ import {
   toVocabularyWord
 } from "../lib/vocabularySerialize.js";
 import { listExampleSentences } from "../lib/exampleSentenceSerialize.js";
+import { ADMIN_AUTH, infoHandler } from "../lib/endpointInfo.js";
 import { VOCABULARY_IMAGE_MIME_TYPES, storeVocabularyImage } from "../lib/vocabularyStorage.js";
 import { unknownSubtopicMessage, unknownTopicMessage } from "../lib/taxonomy.js";
 import { parsePagination } from "../lib/pagination.js";
@@ -34,6 +35,85 @@ import {
 } from "../validators.js";
 
 export const vocabularyAdminRouter = Router();
+
+// Registered before requireAdmin below so /info stays public even though the
+// endpoints it documents require admin auth — it only describes usage.
+vocabularyAdminRouter.get(
+  "/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/vocabulary",
+    description: "Lista resúmenes de sets de vocabulario (vista admin, sin filtro por topic).",
+    auth: ADMIN_AUTH,
+    query: { page: "opcional, default 1", limit: "opcional, default 20, máx 100" },
+    response_example: {
+      data: [{ id: "set_1", topic: "body", subtopic: "fingers", content_type: "list", title: "Fingers", item_count: 12 }],
+      pagination: { page: 1, limit: 20, total: 7 }
+    }
+  })
+);
+
+vocabularyAdminRouter.get(
+  "/:topic/:subtopic/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/vocabulary/:topic/:subtopic",
+    description: "Detalle de set de vocabulario (vista admin, mismo shape que GET /api/vocabulary/:topic/:subtopic).",
+    auth: ADMIN_AUTH,
+    params: { topic: "requerido", subtopic: "requerido" },
+    query: { lang: "opcional — locale para la traducción overlay de words, default es" },
+    response_example: {
+      id: "set_1",
+      topic: "body",
+      subtopic: "fingers",
+      content_type: "list",
+      title: "Fingers",
+      pages: [],
+      words: [{ word_index: 0, term: "指", furigana: "[指](furigana:ゆび)", translation: "finger" }],
+      example_sentences: [],
+      layout: { type: "grid" }
+    }
+  })
+);
+
+vocabularyAdminRouter.get(
+  "/:topic/:subtopic/words/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/vocabulary/:topic/:subtopic/words",
+    description: "Palabras paginadas de un set (vista admin, idéntico a GET /api/vocabulary/:topic/:subtopic/words).",
+    auth: ADMIN_AUTH,
+    params: { topic: "requerido", subtopic: "requerido" },
+    query: {
+      page: "opcional, default 1",
+      limit: "opcional, default 20, máx 100",
+      lang: "opcional — locale para la traducción overlay, default es"
+    },
+    response_example: {
+      data: [{ word_index: 0, term: "指", furigana: "[指](furigana:ゆび)", translation: "finger" }],
+      pagination: { page: 1, limit: 20, total: 12 }
+    }
+  })
+);
+
+vocabularyAdminRouter.get(
+  "/:topic/:subtopic/pages/:pageIndex/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/vocabulary/:topic/:subtopic/pages/:pageIndex",
+    description: "Devuelve el detalle de una página de un set content_type: image (imagen + entries) para editarla.",
+    auth: ADMIN_AUTH,
+    params: { topic: "requerido", subtopic: "requerido", pageIndex: "requerido — índice de página, entero desde 0" },
+    response_example: {
+      page_index: 0,
+      image_url: "https://.../p000.webp",
+      image_checksum: "sha256:...",
+      width: 1600,
+      height: 2400,
+      entries: [{ entry_index: 0, entry_box: { x: 0, y: 0, width: 0, height: 0 }, full_text: "頭", tokens: ["頭"], furigana: "...", morphology: [] }]
+    }
+  })
+);
 
 vocabularyAdminRouter.use(requireAdmin);
 

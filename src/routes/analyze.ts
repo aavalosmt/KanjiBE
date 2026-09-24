@@ -1,8 +1,25 @@
 import { Router } from "express";
+import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
 import { analyzeBlock } from "../lib/kuromoji.js";
 import { asString } from "../lib/pagination.js";
 
 export const analyzeRouter = Router();
+
+analyzeRouter.get(
+  "/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/analyze",
+    description:
+      "Tokeniza un bloque de texto japonés (kuromoji) y devuelve sus tokens con lectura/POS. Mismo comportamiento que POST /api/analyze pero vía query string.",
+    auth: PUBLIC_AUTH,
+    query: { text: "texto a analizar (alias: q), requerido, máx 4000 caracteres" },
+    response_example: {
+      text: "食べた",
+      tokens: [{ surface: "食べ", lemma: "食べる", reading: "タベ", pos: "verb", colorType: "verb", color: "#10B981" }]
+    }
+  })
+);
 
 async function handleAnalyze(raw: string | undefined, res: import("express").Response) {
   const text = raw?.trim();

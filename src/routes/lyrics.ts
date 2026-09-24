@@ -1,10 +1,42 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
+import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toLyric, toLyricSummary } from "../lib/serialize.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
 
 export const lyricsRouter = Router();
+
+lyricsRouter.get(
+  "/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/lyrics",
+    description: "Lista resúmenes de letras de canciones, paginado y filtrable por nivel.",
+    auth: PUBLIC_AUTH,
+    query: {
+      page: "opcional, default 1",
+      limit: "opcional, default 20, máx 100",
+      level: "opcional — filtra por nivel",
+      lang: "opcional — locale para la traducción overlay, default es"
+    },
+    response_example: {
+      data: [
+        {
+          id: "lyric_1",
+          title: "...",
+          artist: "...",
+          level: "N4",
+          translation: "...",
+          translationLang: "es",
+          coverUrl: null,
+          youtubeUrl: null
+        }
+      ],
+      pagination: { page: 1, limit: 20, total: 10 }
+    }
+  })
+);
 
 lyricsRouter.get("/", async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
@@ -42,6 +74,31 @@ lyricsRouter.get("/", async (req, res) => {
     pagination: { page, limit, total }
   });
 });
+
+lyricsRouter.get(
+  "/:id/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/lyrics/:id",
+    description: "Devuelve una letra completa (con blocks sincronizados) por id.",
+    auth: PUBLIC_AUTH,
+    params: { id: "requerido — id de la letra" },
+    query: { lang: "opcional — locale para la traducción overlay, default es" },
+    response_example: {
+      id: "lyric_1",
+      title: "...",
+      artist: "...",
+      level: "N4",
+      translation: "...",
+      translationLang: "es",
+      coverUrl: null,
+      youtubeUrl: null,
+      blocks: [{ id: "b1", type: "text", content: "...", translation: "...", startTime: 0 }],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z"
+    }
+  })
+);
 
 lyricsRouter.get("/:id", async (req, res) => {
   const lang = normalizeLang(req.query.lang);

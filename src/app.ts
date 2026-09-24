@@ -83,11 +83,16 @@ export function createApp() {
   app.use("/api/manga", mangaRouter);
   app.use("/api/vocabulary", vocabularyRouter);
   app.use("/api/examples", examplesRouter);
-  app.use("/api/admin", adminRouter);
-  app.use("/api/admin", uploadRouter);
+  // More specific /api/admin/* sub-routers must be mounted before the
+  // generic adminRouter: adminRouter applies requireAdmin as blanket
+  // (path-less) middleware, so mounting it first would intercept every
+  // /api/admin/manga|vocabulary|examples/* request — including their public
+  // /info routes — before it ever reaches these routers.
   app.use("/api/admin/manga", mangaAdminRouter);
   app.use("/api/admin/vocabulary", vocabularyAdminRouter);
   app.use("/api/admin/examples", exampleSentencesAdminRouter);
+  app.use("/api/admin", adminRouter);
+  app.use("/api/admin", uploadRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

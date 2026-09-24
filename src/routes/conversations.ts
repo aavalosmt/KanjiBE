@@ -1,10 +1,42 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
+import { infoHandler, PUBLIC_AUTH } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toConversation, toConversationSummary } from "../lib/serialize.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
 
 export const conversationsRouter = Router();
+
+conversationsRouter.get(
+  "/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/conversations",
+    description: "Lista resúmenes de conversaciones, paginado y filtrable por topic y nivel.",
+    auth: PUBLIC_AUTH,
+    query: {
+      page: "opcional, default 1",
+      limit: "opcional, default 20, máx 100",
+      topic: "opcional — slug de topic registrado",
+      level: "opcional — filtra por nivel",
+      lang: "opcional — locale para la traducción overlay, default es"
+    },
+    response_example: {
+      data: [
+        {
+          id: "conv_1",
+          title: "...",
+          topic: "body",
+          level: "N5",
+          translation: "...",
+          translationLang: "es",
+          coverUrl: null
+        }
+      ],
+      pagination: { page: 1, limit: 20, total: 5 }
+    }
+  })
+);
 
 conversationsRouter.get("/", async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
@@ -45,6 +77,30 @@ conversationsRouter.get("/", async (req, res) => {
     pagination: { page, limit, total }
   });
 });
+
+conversationsRouter.get(
+  "/:id/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/conversations/:id",
+    description: "Devuelve una conversación completa (con blocks) por id.",
+    auth: PUBLIC_AUTH,
+    params: { id: "requerido — id de la conversación" },
+    query: { lang: "opcional — locale para la traducción overlay, default es" },
+    response_example: {
+      id: "conv_1",
+      title: "...",
+      topic: "body",
+      level: "N5",
+      translation: "...",
+      translationLang: "es",
+      coverUrl: null,
+      blocks: [{ id: "b1", type: "dialogue", content: "...", translation: "..." }],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z"
+    }
+  })
+);
 
 conversationsRouter.get("/:id", async (req, res) => {
   const lang = normalizeLang(req.query.lang);

@@ -29,6 +29,10 @@ Importar JSON (cuentos/canciones/conversaciones): [http://localhost:3000/admin/#
 Tokenizar / traducir con IA: misma página. Elige proveedor en el panel — Gemini (`GEMINI_API_KEY`) o Grok/xAI (`XAI_API_KEY`). `AI_PROVIDER` fija el predeterminado (`gemini` por defecto); `XAI_MODEL` el modelo Grok por defecto.  
 Admin key de desarrollo: `dev-admin-key` (cámbiala en `.env` antes de subir a hosting).
 
+## Auto-documentación (`/info`)
+
+Todo endpoint `GET` tiene un sidecar `GET <ruta>/info` (p. ej. `GET /api/stories/info`, `GET /api/stories/:id/info`, `GET /api/vocabulary/:topic/:subtopic/info`) que devuelve `{ method, path, description, auth, params?, query?, response_example }`. Siempre público, incluso bajo `/api/admin/*` — solo documenta, no expone datos. Ver `src/lib/endpointInfo.ts`.
+
 ## Endpoints públicos (iOS)
 
 - `GET /api/stories?page=1&limit=20&level=N3`

@@ -28,6 +28,7 @@ import {
   pruneOrphanedBlockTranslations,
   upsertTranslationOverlay
 } from "../lib/translations.js";
+import { ADMIN_AUTH, infoHandler } from "../lib/endpointInfo.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import {
   conversationCreateSchema,
@@ -46,6 +47,79 @@ import {
 } from "../validators.js";
 
 export const adminRouter = Router();
+
+// Registered before requireAdmin below so /info stays public even though the
+// endpoints it documents require admin auth — it only describes usage.
+adminRouter.get(
+  "/session/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/session",
+    description: "Verifica la admin key y reporta qué providers de IA están configurados.",
+    auth: ADMIN_AUTH,
+    response_example: { ok: true, gemini: true, xai: false, defaultProvider: "gemini" }
+  })
+);
+
+adminRouter.get(
+  "/gemini/models/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/gemini/models",
+    description: "Lista modelos Gemini disponibles. 503 si GEMINI_API_KEY no está configurada.",
+    auth: ADMIN_AUTH,
+    response_example: { models: [{ name: "models/gemini-2.5-flash", displayName: "Gemini 2.5 Flash" }] }
+  })
+);
+
+adminRouter.get(
+  "/ai/models/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/ai/models",
+    description: "Lista modelos disponibles del provider de IA indicado (gemini o xai). 503 si su API key no está configurada.",
+    auth: ADMIN_AUTH,
+    query: { provider: "opcional — gemini | xai, default resuelto por config" },
+    response_example: { provider: "gemini", models: [{ name: "models/gemini-2.5-flash", displayName: "Gemini 2.5 Flash" }] }
+  })
+);
+
+adminRouter.get(
+  "/lrclib/search/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/lrclib/search",
+    description: "Busca canciones en lrclib.net por texto libre, hasta 20 resultados.",
+    auth: ADMIN_AUTH,
+    query: { q: "requerido — texto de búsqueda (título/artista)" },
+    response_example: {
+      data: [
+        {
+          id: 12345,
+          title: "...",
+          artist: "...",
+          album: "...",
+          duration: 240,
+          instrumental: false,
+          synced: true,
+          hasLyrics: true
+        }
+      ]
+    }
+  })
+);
+
+adminRouter.get(
+  "/lrclib/preview/info",
+  infoHandler({
+    method: "GET",
+    path: "/api/admin/lrclib/preview",
+    description: "Previsualiza una letra sincronizada de lrclib.net por id, sin importarla todavía.",
+    auth: ADMIN_AUTH,
+    query: { id: "requerido — id de track en lrclib" },
+    response_example: { title: "...", artist: "...", blocks: [] }
+  })
+);
 
 adminRouter.use(requireAdmin);
 

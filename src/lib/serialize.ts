@@ -9,7 +9,12 @@ import type {
 } from "../types.js";
 import { analyzeBlock } from "./kuromoji.js";
 import { preserveStartTimes } from "./timestamps.js";
-import { normalizeBlocks, parseBlocks, type blockSchema } from "../validators.js";
+import {
+  DEFAULT_CONTENT_LANGUAGE,
+  normalizeBlocks,
+  parseBlocks,
+  type blockSchema
+} from "../validators.js";
 import { LEGACY_LANG, resolveText, type EntityOverlay } from "./translations.js";
 import type { z } from "zod";
 
@@ -26,10 +31,17 @@ function applyBlockOverlay(
   });
 }
 
+// Japanese blocks get kuromoji tokens (overwriting any sent). Other languages
+// have no analyzer, so hand-authored tokens (e.g. with glosses) are kept as sent.
 export async function persistBlocks(
-  blocks: z.infer<typeof blockSchema>[]
+  blocks: z.infer<typeof blockSchema>[],
+  language: string = DEFAULT_CONTENT_LANGUAGE
 ): Promise<string> {
-  return serializeBlocks(await enrichBlocksWithTokens(normalizeBlocks(blocks)));
+  const normalized = normalizeBlocks(blocks);
+  if (language !== DEFAULT_CONTENT_LANGUAGE) {
+    return serializeBlocks(normalized);
+  }
+  return serializeBlocks(await enrichBlocksWithTokens(normalized));
 }
 
 export async function enrichBlocksWithTokens(blocks: ContentBlock[]): Promise<ContentBlock[]> {
@@ -108,6 +120,7 @@ type ConversationRecord = {
   id: string;
   title: string;
   topic: string;
+  language?: string;
   level?: string | null;
   translation: string | null;
   coverUrl: string | null;
@@ -186,6 +199,7 @@ export function toConversationSummary(
     id: conversation.id,
     title: conversation.title,
     topic: conversation.topic,
+    language: conversation.language ?? DEFAULT_CONTENT_LANGUAGE,
     level: conversation.level ?? null,
     translation: resolved.text,
     translationLang: resolved.lang,

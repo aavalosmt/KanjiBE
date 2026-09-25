@@ -347,10 +347,11 @@ adminRouter.post("/import", async (req, res) => {
       const data = {
         title: item.title,
         topic: item.topic,
+        language: item.language,
         level: item.level ?? null,
         translation: item.translation ?? null,
         coverUrl: item.coverUrl ?? null,
-        blocks: await persistBlocks(item.blocks)
+        blocks: await persistBlocks(item.blocks, item.language)
       };
       if (item.id) {
         const existing = await prisma.conversation.findUnique({ where: { id: item.id } });
@@ -650,10 +651,11 @@ adminRouter.post("/conversations", async (req, res) => {
         id: payload.id,
         title: payload.title,
         topic: payload.topic,
+        language: payload.language,
         level: payload.level ?? null,
         translation: payload.translation ?? null,
         coverUrl: payload.coverUrl ?? null,
-        blocks: await persistBlocks(payload.blocks)
+        blocks: await persistBlocks(payload.blocks, payload.language)
       }
     });
     res.status(201).json(toConversation(conversation));
@@ -677,7 +679,23 @@ adminRouter.put("/conversations/:id", async (req, res) => {
     }
   }
 
-  const serializedBlocks = payload.blocks ? await persistBlocks(payload.blocks) : undefined;
+  let serializedBlocks: string | undefined;
+  if (payload.blocks) {
+    // Blocks are tokenized per language, so resolve it even when only blocks change.
+    let language = payload.language;
+    if (!language) {
+      const existing = await prisma.conversation.findUnique({
+        where: { id: req.params.id },
+        select: { language: true }
+      });
+      if (!existing) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+      }
+      language = existing.language;
+    }
+    serializedBlocks = await persistBlocks(payload.blocks, language);
+  }
 
   try {
     const conversation = await prisma.conversation.update({
@@ -685,6 +703,7 @@ adminRouter.put("/conversations/:id", async (req, res) => {
       data: {
         title: payload.title,
         topic: payload.topic,
+        language: payload.language,
         level: payload.level,
         translation: payload.translation,
         coverUrl: payload.coverUrl,

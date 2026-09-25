@@ -3,31 +3,37 @@ import { prisma } from "../db.js";
 import { ADMIN_AUTH, infoHandler, PUBLIC_AUTH, TOKENIZATION_ANALYZE } from "../lib/endpointInfo.js";
 import { asString, parsePagination } from "../lib/pagination.js";
 import { toConversation, toConversationSummary } from "../lib/serialize.js";
+import { DEFAULT_CONTENT_LANGUAGE } from "../validators.js";
 import { fetchTranslationOverlay, normalizeLang } from "../lib/translations.js";
 
 export const conversationsRouter = Router();
+
+const ALL_LANGUAGES = "all";
 
 conversationsRouter.get(
   "/info",
   infoHandler({
     method: "GET",
     path: "/api/conversations",
-    description: "Lista resúmenes de conversaciones, paginado y filtrable por topic y nivel.",
+    description:
+      "Lista resúmenes de conversaciones, paginado y filtrable por idioma, topic y nivel. Sin language devuelve solo japonés (ja).",
     auth: PUBLIC_AUTH,
     query: {
       page: "opcional, default 1",
       limit: "opcional, default 20, máx 100",
+      language: "opcional — idioma del contenido (ISO 639-1: ja, ko…), default ja; all = todos",
       topic: "opcional — slug de topic registrado",
-      level: "opcional — filtra por nivel",
+      level: "opcional — filtra por nivel (JLPT N5–N1 en ja, TOPIK1–TOPIK6 en ko)",
       lang: "opcional — locale para la traducción overlay, default es"
     },
-    example_request: "GET /api/conversations?page=1&limit=20&topic=body&level=N5",
+    example_request: "GET /api/conversations?page=1&limit=20&language=ko&topic=travel&level=TOPIK1",
     response_example: {
       data: [
         {
           id: "conv_1",
           title: "...",
           topic: "body",
+          language: "ja",
           level: "N5",
           translation: "...",
           translationLang: "es",
@@ -39,12 +45,14 @@ conversationsRouter.get(
     create: {
       method: "POST",
       path: "/api/admin/conversations",
-      description: "Crea una conversación nueva con sus blocks. topic debe ser un slug ya registrado (POST /api/admin/topics); 400 si no. 409 si id ya existe.",
+      description:
+        "Crea una conversación nueva con sus blocks. topic debe ser un slug ya registrado (POST /api/admin/topics); 400 si no. 409 si id ya existe. language (default ja): en ja los tokens se generan con kuromoji; en cualquier otro idioma se guardan los tokens enviados tal cual (surface, lemma, gloss, note…).",
       auth: ADMIN_AUTH,
       body_example: {
         id: "conv_1",
         title: "コンビニで",
         topic: "convenience_store",
+        language: "ja",
         level: "N4",
         translation: "En la tienda de conveniencia",
         coverUrl: null,
@@ -61,7 +69,9 @@ conversationsRouter.get("/", async (req, res) => {
   const topic = asString(req.query.topic);
   const level = asString(req.query.level);
   const lang = normalizeLang(req.query.lang);
+  const language = asString(req.query.language)?.trim().toLowerCase() || DEFAULT_CONTENT_LANGUAGE;
   const where = {
+    ...(language === ALL_LANGUAGES ? {} : { language }),
     ...(topic ? { topic } : {}),
     ...(level ? { level } : {})
   };
@@ -76,6 +86,7 @@ conversationsRouter.get("/", async (req, res) => {
         id: true,
         title: true,
         topic: true,
+        language: true,
         level: true,
         translation: true,
         coverUrl: true
@@ -110,6 +121,7 @@ conversationsRouter.get(
       id: "conv_1",
       title: "...",
       topic: "body",
+      language: "ja",
       level: "N5",
       translation: "...",
       translationLang: "es",
@@ -127,7 +139,7 @@ conversationsRouter.get(
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z"
     },
-    tokenization: `Solo en bloques type: "text" | "header" | "dialogue" con content. ${TOKENIZATION_ANALYZE}`
+    tokenization: `language ja: solo en bloques type: "text" | "header" | "dialogue" con content. ${TOKENIZATION_ANALYZE} Otros idiomas (ko…): tokens escritos a mano, sin colorType/color, con gloss (significado de la palabra) y note opcional; pueden faltar.`
   })
 );
 

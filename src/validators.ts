@@ -23,11 +23,23 @@ export const blockTokenSchema = z.object({
   reading: z.string().nullable().optional(),
   pos: z.string().optional(),
   posEn: z.string().nullable().optional(),
-  colorType: z.string(),
-  color: z.string(),
+  colorType: z.string().optional(),
+  color: z.string().optional(),
   inflectionEn: z.string().nullable().optional(),
-  grammarEn: z.string().nullable().optional()
+  grammarEn: z.string().nullable().optional(),
+  gloss: z.string().nullable().optional(),
+  note: z.string().nullable().optional()
 });
+
+export const DEFAULT_CONTENT_LANGUAGE = "ja";
+
+// Language the conversation is written in (ISO 639-1: "ja", "ko", ...). Not the
+// same as `lang`, which picks the translation overlay locale.
+export const contentLanguage = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z]{2}$/, "language must be an ISO 639-1 code, e.g. ja or ko");
 
 export const blockSchema = z
   .object({
@@ -131,6 +143,7 @@ export const conversationCreateSchema = z.object({
   id: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1),
   topic: z.string().trim().min(1),
+  language: contentLanguage.default(DEFAULT_CONTENT_LANGUAGE),
   level: nullableText,
   translation: nullableText,
   coverUrl: nullableText,
@@ -141,6 +154,7 @@ export const conversationUpdateSchema = z
   .object({
     title: optionalText,
     topic: optionalText,
+    language: contentLanguage.optional(),
     level: nullableText,
     translation: nullableText,
     coverUrl: nullableText,

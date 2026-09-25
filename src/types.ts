@@ -6,10 +6,12 @@ export type BlockToken = {
   reading?: string | null;
   pos?: string;
   posEn?: string | null;
-  colorType: string;
-  color: string;
+  colorType?: string;
+  color?: string;
   inflectionEn?: string | null;
   grammarEn?: string | null;
+  gloss?: string | null;
+  note?: string | null;
 };
 
 export type ContentBlock = {
@@ -62,6 +64,7 @@ export type ConversationSummary = {
   id: string;
   title: string;
   topic: string;
+  language: string;
   level: string | null;
   translation: string | null;
   translationLang: string;

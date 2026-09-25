@@ -38,6 +38,11 @@ async function ensureTables() {
     if (!(await hasColumn("Lyric", "youtubeUrl"))) {
       await prisma.$executeRawUnsafe(`ALTER TABLE "Lyric" ADD COLUMN "youtubeUrl" TEXT`);
     }
+    if (!(await hasColumn("Conversation", "language"))) {
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "Conversation" ADD COLUMN "language" TEXT NOT NULL DEFAULT 'ja'`
+      );
+    }
     return;
   }
 
@@ -72,6 +77,7 @@ async function ensureTables() {
       "id" TEXT NOT NULL PRIMARY KEY,
       "title" TEXT NOT NULL,
       "topic" TEXT NOT NULL,
+      "language" TEXT NOT NULL DEFAULT 'ja',
       "level" TEXT,
       "translation" TEXT,
       "coverUrl" TEXT,

@@ -241,6 +241,96 @@ describe("public conversations", () => {
   });
 });
 
+describe("conversation language", () => {
+  const koreanPayload = {
+    id: "conv-ko",
+    title: "편의점에서",
+    topic: "convenience_store",
+    language: "ko",
+    level: "TOPIK1",
+    translation: "En la tienda de conveniencia",
+    blocks: [
+      {
+        id: "k1",
+        type: "dialogue",
+        speaker: "점원 (Empleado)",
+        content: "봉투 필요하세요?",
+        translation: "¿Necesita bolsa?",
+        tokens: [
+          { surface: "봉투", lemma: "봉투", gloss: "bolsa" },
+          { surface: "필요하세요?", lemma: "필요하다", gloss: "¿necesita?", note: "-(으)세요 = forma cortés" }
+        ]
+      }
+    ]
+  };
+
+  it("defaults to ja and keeps other languages out of the default list", async () => {
+    await request(app).post("/api/admin/conversations").set(admin).send(conversationPayload);
+    const created = await request(app).post("/api/admin/conversations").set(admin).send(koreanPayload);
+    expect(created.status).toBe(201);
+    expect(created.body.language).toBe("ko");
+
+    const byDefault = await request(app).get("/api/conversations");
+    expect(byDefault.body.pagination.total).toBe(1);
+    expect(byDefault.body.data[0]).toMatchObject({ id: "conv-789", language: "ja" });
+
+    const korean = await request(app).get("/api/conversations?language=ko");
+    expect(korean.body.pagination.total).toBe(1);
+    expect(korean.body.data[0]).toMatchObject({ id: "conv-ko", language: "ko", level: "TOPIK1" });
+
+    const all = await request(app).get("/api/conversations?language=all");
+    expect(all.body.pagination.total).toBe(2);
+  });
+
+  it("stores hand-authored tokens with glosses for non-Japanese conversations", async () => {
+    await request(app).post("/api/admin/conversations").set(admin).send(koreanPayload);
+
+    const res = await request(app).get("/api/conversations/conv-ko");
+    expect(res.body.blocks[0].tokens).toEqual(koreanPayload.blocks[0].tokens);
+  });
+
+  it("keeps the stored language when only blocks are updated", async () => {
+    await request(app).post("/api/admin/conversations").set(admin).send(koreanPayload);
+
+    const tokens = [{ surface: "네", lemma: "네", gloss: "sí" }];
+    const updated = await request(app)
+      .put("/api/admin/conversations/conv-ko")
+      .set(admin)
+      .send({ blocks: [{ id: "k1", type: "dialogue", speaker: "손님 (Cliente)", content: "네", tokens }] });
+    expect(updated.status).toBe(200);
+    expect(updated.body.language).toBe("ko");
+    expect(updated.body.blocks[0].tokens).toEqual(tokens);
+  });
+
+  it("still replaces sent tokens with kuromoji tokens for Japanese", async () => {
+    const res = await request(app)
+      .post("/api/admin/conversations")
+      .set(admin)
+      .send({
+        ...conversationPayload,
+        blocks: [
+          {
+            id: "b1",
+            type: "dialogue",
+            speaker: "A",
+            content: "食べました",
+            tokens: [{ surface: "x", lemma: "x", gloss: "ignored" }]
+          }
+        ]
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.blocks[0].tokens[0]).toMatchObject({ lemma: "食べる", colorType: "verb" });
+  });
+
+  it("rejects a language that is not an ISO 639-1 code", async () => {
+    const res = await request(app)
+      .post("/api/admin/conversations")
+      .set(admin)
+      .send({ ...koreanPayload, language: "korean" });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("public topics", () => {
   it("lists topics sorted by label", async () => {
     const res = await request(app).get("/api/topics");
